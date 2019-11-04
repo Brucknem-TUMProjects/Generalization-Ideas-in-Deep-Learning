@@ -1,0 +1,67 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{fancyhdr}
+\usepackage{seminar}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{float}
+\usepackage{hyperref}
+
+\pagestyle{fancy}
+
+
+%You can add theorem-like environments (e.g. remark, definition, ...) if you want
+\newtheorem{theorem}{Theorem}
+
+\title{Title} % Replace with your title
+\author{Student Name} % Replace with your name
+\institute{\textit{Seminar: Optimization and Generalization in Deep Learning}}
+
+\makeatletter
+\let\runauthor\@author
+\let\runtitle\@title
+\makeatother
+\lhead{\runauthor}
+\rhead{\runtitle}
+
+
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Write a brief abstract here (around 150 words).
+\end{abstract}
+
+\section{A few remarks}
+
+Each report should include an introduction describing the problem, the motivations and a brief outline. The main approach should then be described and discussed in separate sections, followed by experimental results (when applicable) and conclusions.
+
+\begin{itemize}
+\item Please use citations when appropriate. Again, you are not expected to read through all the references appearing in your assigned paper. Add your citations in bibtex format into the file egbib.bib. An example is \cite{dijkstra59}.
+\item You can use the theorem environment to write theorems. An example:
+\begin{theorem}
+\label{mytheorem}
+Let $p$ be a prime number. Then, for any $a \in \mathbb{N}$, $a^p - a$ is evenly divisible by $p$. More formally,
+\begin{equation}
+a^p \equiv a \, (\mathrm{mod}\, p)\,.
+\end{equation}
+\end{theorem}
+\item Please keep all your formulas numbered.
+\item The report should be 4 to 6 pages long (not including citations).
+\item Reports must be in English.
+\item Please do not change the layout ({\em e.g.}, do not change page margins, font size, etc.).
+\end{itemize}
+	
+\bibliographystyle{plain}
+\bibliography{egbib}
+
+
+
+\end{document}
