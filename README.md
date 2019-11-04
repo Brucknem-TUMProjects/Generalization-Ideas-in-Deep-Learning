@@ -7,3 +7,4 @@ I will explore different measures for the generalization ability of neural nets.
 
 # Literature
 - [Exploring Generalization in Deep Learning](https://papers.nips.cc/paper/7176-exploring-generalization-in-deep-learning.pdf)
+- [Generalization in Deep Learning](https://arxiv.org/pdf/1710.05468.pdf)
