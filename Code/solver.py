@@ -8,12 +8,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import optimizer
 import data_visualization
+from IPython import display
 
 class Solver:
     """ This class trains the given NN model. """
 
     def __init__(self, model, trainloader, validationloader=None, optim='adam', criterion='cross_entropy_loss', optim_config={},
-                lr_decay=1.0, num_epochs=10, verbose=True, print_every=100):
+                lr_decay=1.0, num_epochs=10, verbose=True, log_every=100, plot=False):
         """
         Constructor
 
@@ -28,7 +29,7 @@ class Solver:
             }
         lr_decay            -- the learning rate decay - (default 1.0)
         num_epochs          -- the number of epochs - (default 10)
-        print_every         -- the number of iterations to pass between every verbose log - (default 100)
+        log_every         -- the number of iterations to pass between every verbose log - (default 100)
         verbose             -- wheather or not to log the trainings progress
 
         """
@@ -47,7 +48,8 @@ class Solver:
         self.num_epochs = num_epochs
 
         self.verbose = verbose
-        self.print_every = print_every
+        self.log_every = log_every
+        self.plot = plot
 
         if not hasattr(optimizer, self.criterion):
             raise ValueError('Invalid criterion "%s"' % self.criterion)
@@ -69,12 +71,12 @@ class Solver:
         # Set up some variables for book-keeping
         if self.validationloader:
             self.best_val_acc = 0
-            self.best_params = {}
-            self.val_acc_history = []
+            self.best_params = self.model.parameters()
+            self.val_acc_history = [0]
         
-        self.loss_history = []
-        self.per_iteration_train_acc_history = []
-        self.per_epoch_train_acc_history = []
+        self.loss_history = [None]
+        self.per_iteration_train_acc_history = [0]
+        self.per_epoch_train_acc_history = [0]
 
         # Make a deep copy of the optim_config for each parameter
         # self.optim_configs = {}
@@ -82,6 +84,8 @@ class Solver:
             # d = {k: v for k, v in self.optim_config.items()}
             # self.optim_configs[p] = d
 
+        if self.verbose:
+            self.output_buffer = "";
 
     def train(self):
         """ Trains the network.
@@ -94,10 +98,13 @@ class Solver:
 
         optim_config = self.optim_config
 
+        if self.plot:
+            self.update_plot()
+
         for epoch in range(self.num_epochs):  # loop over the dataset multiple times
             if self.verbose:
-                print(header)
-                print(len(header) * "-")
+                self.print_and_buffer(header)
+                self.print_and_buffer(len(header) * "-")
 
             optimizer, next_lr = self.optimizer(self.model.parameters(), optim_config)
             optim_config['lr'] = next_lr
@@ -119,28 +126,31 @@ class Solver:
                 loss.backward()
                 optimizer.step()
 
-                self.loss_history.append(loss.item())
                 _, predicted_train_labels = torch.max(outputs.data, 1)
                 train_acc = (predicted_train_labels == labels).sum().item() / len(predicted_train_labels)
-                self.per_iteration_train_acc_history.append(train_acc)
+
+                self.loss_history.append(None)
+                self.per_iteration_train_acc_history.append(None)
 
                 # print statistics
                 running_loss += loss.item()
                 running_training_accuracy += train_acc
                 running_epoch_training_accuracy += train_acc
 
-                if i % self.print_every == (self.print_every - 1):
-                    avg_loss = running_loss / self.print_every
-                    avg_acc = running_training_accuracy / self.print_every
+                if i % self.log_every == (self.log_every - 1):
+                    avg_loss = running_loss / self.log_every
+                    avg_acc = running_training_accuracy / self.log_every
 
-                    # self.loss_history.append(avg_loss)
-                    # self.per_iteration_train_acc_history.append(avg_acc)
+                    del self.loss_history[-1]
+                    self.loss_history.append(avg_loss)
+                    del self.per_iteration_train_acc_history[-1]
+                    self.per_iteration_train_acc_history.append(avg_acc)
 
                     running_loss = 0.0
                     running_training_accuracy = 0.0
 
                     if self.verbose:
-                        print('[%5d, %9d] %13.8f | %17.8f' % (epoch + 1, i + 1, avg_loss, avg_acc))
+                        self.print_and_buffer('[%5d, %9d] %13.8f | %17.8f' % (epoch + 1, i + 1, avg_loss, avg_acc))
 
             self.per_epoch_train_acc_history.append(running_epoch_training_accuracy / len(self.trainloader))
 
@@ -165,14 +175,20 @@ class Solver:
                     self.best_params = self.model.state_dict()
 
                 if self.verbose:
-                    print(len(header) * "-")
-                    print('[%5d, %9s] %13s | %17.8f \n' %
+                    self.print_and_buffer(len(header) * "-")
+                    self.print_and_buffer('[%5d, %9s] %13s | %17.8f' %
                           (epoch + 1, "finished", "accuracy:" , val_accuracy))
 
             if self.verbose:
-                print()
+                self.print_and_buffer()
 
+            if self.plot:
+                self.update_plot()
 
+    def update_plot(self):
+        display.clear_output(wait=True)
+        self.print_plots()
+        print(self.output_buffer)
 
     def save_model(self, filename='model.pth'):
         """ Saves the model parameters.
@@ -258,7 +274,10 @@ class Solver:
         """
 
         plt.subplot(2, 1, 1)
-        plt.title('Training loss')
+        plt.title('Training')
+
+        # loss_history, acc_history = self.scale_iterations()
+
         plt.plot(self.loss_history, 'o', label='loss')
         plt.plot(self.per_iteration_train_acc_history, 'o', label='accuracy')
         plt.xlabel('Iteration')
@@ -274,3 +293,24 @@ class Solver:
         plt.legend(loc='lower right')
         plt.gcf().set_size_inches(15, 12)
         plt.show()
+
+
+    def scale_iterations(self):
+        add_in = [None for i in range(self.log_every - 1)]
+        scaled_loss_history = []
+        scaled_acc_history = []
+
+        for i in self.per_iteration_train_acc_history:
+            scaled_acc_history.append(i)
+            scaled_acc_history.extend(add_in)
+        for i in self.loss_history:
+            scaled_loss_history.append(i)
+            scaled_loss_history.extend(add_in)
+
+        return scaled_loss_history, scaled_acc_history
+
+
+    def print_and_buffer(self, message=""):
+        if self.verbose:
+            self.output_buffer += message + "\n"
+        print(message)
