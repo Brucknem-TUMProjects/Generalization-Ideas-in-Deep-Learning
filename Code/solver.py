@@ -70,7 +70,8 @@ class Solver:
         self.best_val_acc = 0
         self.best_params = {}
         self.loss_history = []
-        self.train_acc_history = []
+        self.per_iteration_train_acc_history = []
+        self.per_epoch_train_acc_history = []
         self.val_acc_history = []
 
         # Make a deep copy of the optim_config for each parameter
@@ -102,6 +103,7 @@ class Solver:
 
             running_loss = 0.0
             running_training_accuracy = 0.0
+            running_epoch_training_accuracy = 0;
             for i, data in enumerate(self.trainloader, 0):
                 # get the inputs; data is a list of [inputs, labels]
                 inputs, labels = data[0].to(device), data[1].to(device)
@@ -118,17 +120,27 @@ class Solver:
                 self.loss_history.append(loss.item())
                 _, predicted_train_labels = torch.max(outputs.data, 1)
                 train_acc = (predicted_train_labels == labels).sum().item() / len(predicted_train_labels)
-                self.train_acc_history.append(train_acc)
+                self.per_iteration_train_acc_history.append(train_acc)
 
                 # print statistics
                 running_loss += loss.item()
                 running_training_accuracy += train_acc
-                if self.verbose and i % self.print_every == (self.print_every - 1):
-                    print('[%5d, %9d] %13.8f | %17.8f' %
-                          (epoch + 1, i + 1, running_loss / self.print_every, running_training_accuracy / self.print_every))
+                running_epoch_training_accuracy += train_acc
+
+                if i % self.print_every == (self.print_every - 1):
+                    avg_loss = running_loss / self.print_every
+                    avg_acc = running_training_accuracy / self.print_every
+
+                    # self.loss_history.append(avg_loss)
+                    # self.per_iteration_train_acc_history.append(avg_acc)
+
                     running_loss = 0.0
                     running_training_accuracy = 0.0
 
+                    if self.verbose:
+                        print('[%5d, %9d] %13.8f | %17.8f' % (epoch + 1, i + 1, avg_loss, avg_acc))
+
+            self.per_epoch_train_acc_history.append(running_epoch_training_accuracy / len(self.trainloader))
             # Validation stuff
             total_validation_samples = 0
             correct_validation_samples = 0
@@ -141,6 +153,12 @@ class Solver:
                     correct_validation_samples += (predicted_val_labels == labels).sum().item()
 
             val_accuracy = correct_validation_samples / total_validation_samples
+            self.val_acc_history.append(val_accuracy)
+
+            if val_accuracy > self.best_val_acc:
+                self.best_val_acc = val_accuracy
+                self.best_params = self.model.state_dict()
+
             if self.verbose:
                 print(len(header) * "-")
                 print('[%5d, %9s] %13s | %17.8f \n' %
@@ -192,6 +210,9 @@ class Solver:
 
     # Visualization
     def predict_samples(self, classes=None, num_samples=8):
+        """ Picks some random samples from the validation data and predicts the labels.
+        classes -- list of classnames - (default=None)
+        """
         device = self.device
 
         # get some random training images
@@ -199,7 +220,7 @@ class Solver:
         images, labels = dataiter.next()
 
         real_num_samples = min(num_samples, len(labels))
-        images, labels = images[:real_num_samples].to(device), labels[:real_num_samples].to(device) 
+        images, labels = images[:real_num_samples].to(device), labels[:real_num_samples].to(device)
 
         with torch.no_grad():
             outputs = self.model(images)
@@ -208,9 +229,34 @@ class Solver:
             # show images
             data_visualization.imshow(torchvision.utils.make_grid(images.cpu()))
             if classes:
-                print('%10s: %s' % ('Real', ' '.join('%5s' % classes[labels[j]] for j in range(real_num_samples))))
-                print('%10s: %s' % ('Predicted', ' '.join('%5s' % classes[predicted[j]] for j in range(real_num_samples))))
+                print('%10s: %s' % ('Real', ' '.join('%8s' % classes[labels[j]] for j in range(real_num_samples))))
+                print('%10s: %s' % ('Predicted', ' '.join('%8s' % classes[predicted[j]] for j in range(real_num_samples))))
             else:
-                print('%10s: %s' % ('Real', ' '.join('%5s' % labels[j].item() for j in range(real_num_samples))))
-                print('%10s: %s' % ('Predicted', ' '.join('%5s' % predicted[j].item() for j in range(real_num_samples))))
+                print('%10s: %s' % ('Real', ' '.join('%8s' % labels[j].item() for j in range(real_num_samples))))
+                print('%10s: %s' % ('Predicted', ' '.join('%8s' % predicted[j].item() for j in range(real_num_samples))))
 
+
+    def print_plots(self):
+        plt.subplot(2, 1, 1)
+        plt.title('Training loss')
+        plt.plot(self.loss_history, 'o')
+        plt.xlabel('Iteration')
+
+        plt.subplot(2, 1, 2)
+        plt.title('Accuracy')
+        plt.plot(self.per_epoch_train_acc_history, '-o', label='train')
+        plt.plot(self.val_acc_history, '-o', label='val')
+        plt.plot([0.5] * len(self.val_acc_history), 'k--')
+        plt.xlabel('Epoch')
+        plt.legend(loc='lower right')
+        plt.gcf().set_size_inches(15, 12)
+        plt.show()
+
+
+def stretch_to(l, n):
+    out = [None] * n
+    m = len(l)
+    for i, x in enumerate(l):
+        out[i*(n-1)//(m-1)] = x
+
+    return out

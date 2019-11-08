@@ -11,11 +11,13 @@ import torch.optim as optim
 # Update rules
 
 def sgd(params, optim_params, lr_decay=1.0):
+    """ Stocastic gradient descent. """
     lr = optim_params.get('lr', 0.001)
     momentum = optim_params.get('beta', 0.9)
     return optim.SGD(params, lr=lr, momentum=momentum), lr * lr_decay
 
 def adam(params, optim_params, lr_decay=1.0):
+    """ Adam solver. """
     lr = optim_params.get('lr', 1e-3)
     betas = optim_params.get('betas', (0.9, 0.999))
     eps = optim_params.get('eps', 1e-8)

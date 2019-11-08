@@ -1,12 +1,6 @@
-import torch
 import torchvision
-import torchvision.models as models
-import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
-import optimizer
 
 def imshow(img):
     img = img / 2 + 0.5     # unnormalize
@@ -26,7 +20,7 @@ def show_samples(loader, classes=None, num_samples=8):
     imshow(torchvision.utils.make_grid(images))
     # print labels
     if classes:
-        print(' '.join('%s' % classes[labels[j]] for j in range(real_num_samples)))
+        print('  ' + ' '.join('%8s' % classes[labels[j]] for j in range(real_num_samples)))
     else:
-        print(' '.join('%s' % labels[j].item() for j in range(real_num_samples)))
+        print('  ' + ' '.join('%8s' % labels[j].item() for j in range(real_num_samples)))
 
