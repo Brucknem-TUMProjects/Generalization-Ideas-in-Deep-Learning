@@ -239,14 +239,16 @@ class Solver:
     def print_plots(self):
         plt.subplot(2, 1, 1)
         plt.title('Training loss')
-        plt.plot(self.loss_history, 'o')
+        plt.plot(self.loss_history, 'o', label='loss')
+        plt.plot(self.per_iteration_train_acc_history, 'o', label='accuracy')
         plt.xlabel('Iteration')
+        plt.legend(loc='lower right')
 
         plt.subplot(2, 1, 2)
         plt.title('Accuracy')
         plt.plot(self.per_epoch_train_acc_history, '-o', label='train')
         plt.plot(self.val_acc_history, '-o', label='val')
-        plt.plot([0.5] * len(self.val_acc_history), 'k--')
+        # plt.plot([0.5] * len(self.val_acc_history), 'k--')
         plt.xlabel('Epoch')
         plt.legend(loc='lower right')
         plt.gcf().set_size_inches(15, 12)
