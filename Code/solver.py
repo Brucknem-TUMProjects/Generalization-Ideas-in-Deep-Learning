@@ -12,7 +12,7 @@ import data_visualization
 class Solver:
     """ This class trains the given NN model. """
 
-    def __init__(self, model, trainloader, validationloader, optim='adam', criterion='cross_entropy_loss', optim_config={},
+    def __init__(self, model, trainloader, validationloader=None, optim='adam', criterion='cross_entropy_loss', optim_config={},
                 lr_decay=1.0, num_epochs=10, verbose=True, print_every=100):
         """
         Constructor
@@ -67,12 +67,14 @@ class Solver:
         manually.
         """
         # Set up some variables for book-keeping
-        self.best_val_acc = 0
-        self.best_params = {}
+        if self.validationloader:
+            self.best_val_acc = 0
+            self.best_params = {}
+            self.val_acc_history = []
+        
         self.loss_history = []
         self.per_iteration_train_acc_history = []
         self.per_epoch_train_acc_history = []
-        self.val_acc_history = []
 
         # Make a deep copy of the optim_config for each parameter
         # self.optim_configs = {}
@@ -141,28 +143,34 @@ class Solver:
                         print('[%5d, %9d] %13.8f | %17.8f' % (epoch + 1, i + 1, avg_loss, avg_acc))
 
             self.per_epoch_train_acc_history.append(running_epoch_training_accuracy / len(self.trainloader))
-            # Validation stuff
-            total_validation_samples = 0
-            correct_validation_samples = 0
-            with torch.no_grad():
-                for data in self.validationloader:
-                    inputs, labels = data[0].to(device), data[1].to(device)
-                    outputs = self.model(inputs)
-                    _, predicted_val_labels = torch.max(outputs.data, 1)
-                    total_validation_samples += labels.size(0)
-                    correct_validation_samples += (predicted_val_labels == labels).sum().item()
 
-            val_accuracy = correct_validation_samples / total_validation_samples
-            self.val_acc_history.append(val_accuracy)
 
-            if val_accuracy > self.best_val_acc:
-                self.best_val_acc = val_accuracy
-                self.best_params = self.model.state_dict()
+            if self.validationloader:
+                # Validation stuff
+                total_validation_samples = 0
+                correct_validation_samples = 0
+                with torch.no_grad():
+                    for data in self.validationloader:
+                        inputs, labels = data[0].to(device), data[1].to(device)
+                        outputs = self.model(inputs)
+                        _, predicted_val_labels = torch.max(outputs.data, 1)
+                        total_validation_samples += labels.size(0)
+                        correct_validation_samples += (predicted_val_labels == labels).sum().item()
+
+                val_accuracy = correct_validation_samples / total_validation_samples
+                self.val_acc_history.append(val_accuracy)
+
+                if val_accuracy > self.best_val_acc:
+                    self.best_val_acc = val_accuracy
+                    self.best_params = self.model.state_dict()
+
+                if self.verbose:
+                    print(len(header) * "-")
+                    print('[%5d, %9s] %13s | %17.8f \n' %
+                          (epoch + 1, "finished", "accuracy:" , val_accuracy))
 
             if self.verbose:
-                print(len(header) * "-")
-                print('[%5d, %9s] %13s | %17.8f \n' %
-                      (epoch + 1, "finished", "accuracy:" , val_accuracy))
+                print()
 
 
 
@@ -182,6 +190,11 @@ class Solver:
         """ Prints the class accuracies.
         classes -- list of classnames - (default=None)
         """
+
+        if not self.validationloader:
+            print("Couldn't calculate accuracies as no validation set was given.")
+            return
+
         device = self.device
         class_correct = {}
         class_total = {}
@@ -237,6 +250,13 @@ class Solver:
 
 
     def print_plots(self):
+        """ Prints the plots for
+            - Training loss
+            - Per iteration Training accuracy
+            - Validation accuracy
+            - Per epoch Training accuracy
+        """
+
         plt.subplot(2, 1, 1)
         plt.title('Training loss')
         plt.plot(self.loss_history, 'o', label='loss')
@@ -247,18 +267,10 @@ class Solver:
         plt.subplot(2, 1, 2)
         plt.title('Accuracy')
         plt.plot(self.per_epoch_train_acc_history, '-o', label='train')
-        plt.plot(self.val_acc_history, '-o', label='val')
+        if self.validationloader:
+            plt.plot(self.val_acc_history, '-o', label='val')
         # plt.plot([0.5] * len(self.val_acc_history), 'k--')
         plt.xlabel('Epoch')
         plt.legend(loc='lower right')
         plt.gcf().set_size_inches(15, 12)
         plt.show()
-
-
-def stretch_to(l, n):
-    out = [None] * n
-    m = len(l)
-    for i, x in enumerate(l):
-        out[i*(n-1)//(m-1)] = x
-
-    return out
