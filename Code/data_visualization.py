@@ -6,10 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-
-
-# Visualization
+import optimizer
 
 def imshow(img):
     img = img / 2 + 0.5     # unnormalize
@@ -17,9 +14,9 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
 
-def show_samples(trainloader, classes, num_samples=5):
+def show_samples(loader, classes=None, num_samples=8):
     # get some random training images
-    dataiter = iter(trainloader)
+    dataiter = iter(loader)
     images, labels = dataiter.next()
 
     real_num_samples = min(num_samples, len(labels))
@@ -28,4 +25,8 @@ def show_samples(trainloader, classes, num_samples=5):
     # show images
     imshow(torchvision.utils.make_grid(images))
     # print labels
-    print(' '.join('%5s' % classes[labels[j]] for j in range(real_num_samples)))
+    if classes:
+        print(' '.join('%s' % classes[labels[j]] for j in range(real_num_samples)))
+    else:
+        print(' '.join('%s' % labels[j].item() for j in range(real_num_samples)))
+
