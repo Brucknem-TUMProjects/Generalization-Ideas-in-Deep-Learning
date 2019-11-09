@@ -1,18 +1,14 @@
 """
 Nice solver my Marcel Bruckner.
 """
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision
-from bokeh.io import output_notebook, push_notebook, show
-from bokeh.layouts import row
-from bokeh.models import ColumnDataSource, LinearAxis, Range1d
-from bokeh.plotting import figure
 from IPython import display
 
 import data_visualization
 import optimizer
+from solver_visualization import *
 
 
 class Solver:
@@ -85,11 +81,11 @@ class Solver:
         if self.validationloader:
             self.best_val_acc = 0
             self.best_params = self.model.parameters()
-            self.val_acc_history = []
+            self.val_acc_history = [0]
 
         self.loss_history = [np.nan]
         self.per_iteration_train_acc_history = [0]
-        self.per_epoch_train_acc_history = []
+        self.per_epoch_train_acc_history = [0]
 
         # Make a deep copy of the optim_config for each parameter
         # self.optim_configs = {}
@@ -97,90 +93,29 @@ class Solver:
         # d = {k: v for k, v in self.optim_config.items()}
         # self.optim_configs[p] = d
 
-        if self.verbose:
-            self.output_buffer = ""
-
-        if self.plot:
-            self.line_width = 2
-            output_notebook()
-            self.tools = "pan,wheel_zoom,box_zoom,reset,save,crosshair"
-
-    def init_training_graphs(self):
-        loss_plt = figure(plot_width=450,
-                          plot_height=400,
-                          tools=self.tools,
-                          title='Training Loss',
-                          x_axis_label='Iteration')
-        loss_plt_data = ColumnDataSource(data=dict(x=[], y=[]))
-        loss_plt.line('x',
-                      'y',
-                      source=loss_plt_data,
-                      line_color='red',
-                      line_width=self.line_width)
-        # loss_handle = show(loss_plt, notebook_handle=True)
-
-        accuracy_plt = figure(plot_width=450,
-                              plot_height=400,
-                              tools=self.tools,
-                              title='Training Accuracy',
-                              x_axis_label='Iteration')
-        accuracy_plt_data = ColumnDataSource(data=dict(x=[], y=[]))
-        accuracy_plt.line('x',
-                          'y',
-                          source=accuracy_plt_data,
-                          line_color='blue',
-                          line_width=self.line_width)
-        # accuracy_handle = show(accuracy_plt, notebook_handle=True)
-
-        training_handle = show(row(loss_plt, accuracy_plt),
-                               notebook_handle=True)
-
-        if self.validationloader:
-            epoch_plot = figure(plot_width=900,
-                                plot_height=400,
-                                tools=self.tools,
-                                title='Accuracy',
-                                x_axis_label='Epoch')
-            epoch_training_plt_data = ColumnDataSource(data=dict(x=[0], y=[0]))
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_training_plt_data,
-                            line_color='red',
-                            line_width=self.line_width)
-
-            epoch_validation_plt_data = ColumnDataSource(
-                data=dict(x=[0], y=[0]))
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_validation_plt_data,
-                            line_color='green',
-                            line_width=self.line_width)
-
-            epoch_handle = show(epoch_plot, notebook_handle=True)
-
-        return training_handle, loss_plt_data, accuracy_plt_data, epoch_handle, epoch_training_plt_data, epoch_validation_plt_data
-
     def train(self):
         """ Trains the network.
         Iterates over the trainings data num_epochs time and performs gradient descent
         based on the optimizer.
         """
 
+        self.printer = SolverPrinter(self.verbose)
+
+        log_every = min(self.log_every, len(self.trainloader) - 1)
+
+        if self.plot:
+            self.plotter = SolverPlotter(self)
+
         device = self.device
         header = "[epoch, iteration] training loss | training accuracy"
 
         optim_config = self.optim_config
 
-        if self.plot:
-            training_handle, training_loss_plt_data, training_accuracy_plt_data, epoch_handle, epoch_training_plt_data, epoch_validation_plt_data = self.init_training_graphs(
-            )
-
         for epoch in range(
                 self.num_epochs):  # loop over the dataset multiple times
 
-            if self.verbose:
-                self.print_and_buffer(header)
-                self.print_and_buffer(len(header) * "-")
+            self.printer.print_and_buffer(header)
+            self.printer.print_and_buffer(len(header) * "-")
 
             optimizer, next_lr = self.optimizer(self.model.parameters(),
                                                 optim_config)
@@ -189,7 +124,6 @@ class Solver:
 
             running_loss = 0.0
             running_training_accuracy = 0.0
-            running_epoch_training_accuracy = 0
 
             for i, data in enumerate(self.trainloader, 0):
                 # get the inputs; data is a list of [inputs, labels]
@@ -214,35 +148,34 @@ class Solver:
                 # print statistics
                 running_loss += loss.item()
                 running_training_accuracy += train_acc
-                running_epoch_training_accuracy += train_acc
 
-                if i % self.log_every == (self.log_every - 1):
-                    avg_loss = running_loss / self.log_every
-                    avg_acc = running_training_accuracy / self.log_every
+                if i % log_every == (log_every - 1):
+                    avg_loss = running_loss / log_every
+                    avg_acc = running_training_accuracy / log_every
 
                     del self.loss_history[-1]
                     self.loss_history.append(avg_loss)
                     del self.per_iteration_train_acc_history[-1]
                     self.per_iteration_train_acc_history.append(avg_acc)
 
-                    training_loss_plt_data.stream(
-                        dict(y=[avg_loss],
-                             x=[epoch * len(self.trainloader) + i]))
-                    training_accuracy_plt_data.stream(
-                        dict(y=[avg_acc],
-                             x=[epoch * len(self.trainloader) + i]))
-                    push_notebook(handle=training_handle)
+                    if self.plot:
+                        total_iteration = epoch * len(self.trainloader) + i
+                        self.plotter.append_training_loss(
+                            total_iteration, avg_loss)
+                        self.plotter.append_training_accuracy(
+                            total_iteration, avg_acc)
 
                     running_loss = 0.0
                     running_training_accuracy = 0.0
 
-                    if self.verbose:
-                        self.print_and_buffer(
-                            '[%5d, %9d] %13.8f | %17.8f' %
-                            (epoch + 1, i + 1, avg_loss, avg_acc))
+                    self.printer.print_and_buffer(
+                        '[%5d, %9d] %13.8f | %17.8f' %
+                        (epoch + 1, i + 1, avg_loss, avg_acc))
 
-            self.per_epoch_train_acc_history.append(
-                running_epoch_training_accuracy / len(self.trainloader))
+            self.per_epoch_train_acc_history.append(avg_acc)
+
+            if self.plot:
+                self.plotter.append_epoch_training_accuracy(epoch + 1, avg_acc)
 
             if self.validationloader:
                 # Validation stuff
@@ -264,30 +197,16 @@ class Solver:
                     self.best_val_acc = val_accuracy
                     self.best_params = self.model.state_dict()
 
-                if self.verbose:
-                    self.print_and_buffer(len(header) * "-")
-                    self.print_and_buffer(
-                        '[%5d, %9s] %13s | %17.8f' %
-                        (epoch + 1, "finished", "accuracy:", val_accuracy))
+                self.printer.print_and_buffer(len(header) * "-")
+                self.printer.print_and_buffer(
+                    '[%5d, %9s] %13s | %17.8f' %
+                    (epoch + 1, "finished", "accuracy:", val_accuracy))
 
-                epoch_training_plt_data.stream(
-                    dict(y=[self.per_iteration_train_acc_history[-1]],
-                         x=[epoch + 1]))
-                epoch_validation_plt_data.stream(
-                    dict(y=[val_accuracy], x=[epoch + 1]))
-                push_notebook(handle=epoch_handle)
+                if self.plot:
+                    self.plotter.append_epoch_validation_accuracy(
+                        epoch + 1, val_accuracy)
 
-            if self.verbose:
-                self.print_and_buffer()
-
-
-#            if self.plot:
-#               self.update_plot()
-
-    def update_plot(self):
-        display.clear_output(wait=True)
-        self.print_plots()
-        print(self.output_buffer)
+            self.printer.print_and_buffer()
 
     def save_model(self, filename='model.pth'):
         """ Saves the model parameters.
@@ -302,42 +221,13 @@ class Solver:
         self.model.load_state_dict(torch.load(filename))
 
     def print_class_accuracies(self, classes=None):
-        """ Prints the class accuracies.
-        classes -- list of classnames - (default=None)
-        """
+        print_class_accuracies(self, classes)
 
-        if not self.validationloader:
-            print(
-                "Couldn't calculate accuracies as no validation set was given."
-            )
+    def print_log(self):
+        print(self.printer.buffer)
 
-            return
-
-        device = self.device
-        class_correct = {}
-        class_total = {}
-
-        with torch.no_grad():
-            for data in self.validationloader:
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = self.model(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                c = (predicted == labels).squeeze()
-
-                for i in range(len(labels)):
-                    label = labels[i].item()
-
-                    class_correct.setdefault(label, 0)
-                    class_correct[label] += c[i].item()
-                    class_total.setdefault(label, 0)
-                    class_total[label] += 1
-
-        if not classes:
-            classes = list(class_total.keys())
-
-        for i in range(len(classes)):
-            print('Accuracy of %5s : %2d %%' %
-                  (classes[i], 100 * class_correct[i] / class_total[i]))
+    def print_bokeh_plots(self):
+        print_bokeh_plots(self)
 
     # Visualization
 
@@ -379,103 +269,3 @@ class Solver:
                     '%10s: %s' %
                     ('Predicted', ' '.join('%8s' % predicted[j].item()
                                            for j in range(real_num_samples))))
-
-    def print_plots(self):
-        """ Prints the plots for
-            - Training loss
-            - Per iteration Training accuracy
-            - Validation accuracy
-            - Per epoch Training accuracy
-        """
-
-        plt.subplot(2, 1, 1)
-        plt.title('Training')
-
-        # loss_history, acc_history = self.scale_iterations()
-
-        plt.plot(self.loss_history, 'o', label='loss')
-        plt.plot(self.per_iteration_train_acc_history, 'o', label='accuracy')
-        plt.xlabel('Iteration')
-        plt.legend(loc='lower right')
-
-        plt.subplot(2, 1, 2)
-        plt.title('Accuracy')
-        plt.plot(self.per_epoch_train_acc_history, '-o', label='train')
-
-        if self.validationloader:
-            plt.plot(self.val_acc_history, '-o', label='val')
-        # plt.plot([0.5] * len(self.val_acc_history), 'k--')
-        plt.xlabel('Epoch')
-        plt.legend(loc='lower right')
-        plt.gcf().set_size_inches(15, 12)
-        plt.show()
-
-    def data_shader_print_plots(self):
-        output_notebook()
-
-        p = figure(plot_height=400,
-                   plot_width=900,
-                   title="Training",
-                   x_axis_label="Iteration")
-
-        p.line(x=range(len(self.loss_history)),
-               y=self.loss_history,
-               legend="Loss",
-               line_color="red",
-               line_width=2)
-        p.y_range = Range1d(0, np.nanmax(self.loss_history))
-
-        p.extra_y_ranges = {
-            'Accuracy':
-            Range1d(0, np.nanmax(self.per_iteration_train_acc_history))
-        }
-        p.add_layout(LinearAxis(y_range_name='Accuracy'), 'right')
-        p.line(x=range(len(self.per_iteration_train_acc_history)),
-               y=self.per_iteration_train_acc_history,
-               legend="Accuracy",
-               line_color="blue",
-               line_width=2,
-               y_range_name='Accuracy')
-
-        show(p)
-
-        p = figure(plot_height=400,
-                   plot_width=900,
-                   title="Training",
-                   x_axis_label="Accuracy")
-
-        p.circle(x=range(len(self.per_epoch_train_acc_history)),
-                 y=self.per_epoch_train_acc_history,
-                 legend="Training",
-                 line_color="red",
-                 line_width=2)
-        p.line(x=range(len(self.per_epoch_train_acc_history)),
-               y=self.per_epoch_train_acc_history,
-               legend="Training",
-               line_color="red",
-               line_width=2)
-        p.y_range = Range1d(0, np.nanmax(self.per_epoch_train_acc_history))
-
-        p.extra_y_ranges = {
-            'Validation': Range1d(0, np.nanmax(self.val_acc_history))
-        }
-        p.add_layout(LinearAxis(y_range_name='Validation'), 'right')
-        p.circle(x=range(len(self.val_acc_history)),
-                 y=self.val_acc_history,
-                 legend="Validation",
-                 line_color="blue",
-                 line_width=2,
-                 y_range_name='Validation')
-        p.line(x=range(len(self.val_acc_history)),
-               y=self.val_acc_history,
-               legend="Validation",
-               line_color="blue",
-               line_width=2,
-               y_range_name='Validation')
-
-        show(p)
-
-    def print_and_buffer(self, message=""):
-        if self.verbose:
-            self.output_buffer += message + "\n"
-        print(message)
