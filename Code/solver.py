@@ -85,11 +85,11 @@ class Solver:
         if self.validationloader:
             self.best_val_acc = 0
             self.best_params = self.model.parameters()
-            self.val_acc_history = [0]
+            self.val_acc_history = []
 
         self.loss_history = [np.nan]
         self.per_iteration_train_acc_history = [0]
-        self.per_epoch_train_acc_history = [0]
+        self.per_epoch_train_acc_history = []
 
         # Make a deep copy of the optim_config for each parameter
         # self.optim_configs = {}
@@ -141,15 +141,24 @@ class Solver:
                                 tools=self.tools,
                                 title='Accuracy',
                                 x_axis_label='Epoch')
-            epoch_plot_data = ColumnDataSource(data=dict(x=[], y=[]))
+            epoch_training_plt_data = ColumnDataSource(data=dict(x=[0], y=[0]))
             epoch_plot.line('x',
                             'y',
-                            source=epoch_plot_data,
+                            source=epoch_training_plt_data,
                             line_color='red',
                             line_width=self.line_width)
+
+            epoch_validation_plt_data = ColumnDataSource(
+                data=dict(x=[0], y=[0]))
+            epoch_plot.line('x',
+                            'y',
+                            source=epoch_validation_plt_data,
+                            line_color='green',
+                            line_width=self.line_width)
+
             epoch_handle = show(epoch_plot, notebook_handle=True)
 
-        return training_handle, loss_plt_data, accuracy_plt_data, epoch_handle, epoch_plot_data
+        return training_handle, loss_plt_data, accuracy_plt_data, epoch_handle, epoch_training_plt_data, epoch_validation_plt_data
 
     def train(self):
         """ Trains the network.
@@ -163,7 +172,7 @@ class Solver:
         optim_config = self.optim_config
 
         if self.plot:
-            training_handle, training_loss_plt_data, training_accuracy_plt_data, epoch_handle, epoch_plot_data = self.init_training_graphs(
+            training_handle, training_loss_plt_data, training_accuracy_plt_data, epoch_handle, epoch_training_plt_data, epoch_validation_plt_data = self.init_training_graphs(
             )
 
         for epoch in range(
@@ -217,10 +226,10 @@ class Solver:
                     self.per_iteration_train_acc_history.append(avg_acc)
 
                     training_loss_plt_data.stream(
-                        dict(y=[running_loss],
+                        dict(y=[avg_loss],
                              x=[epoch * len(self.trainloader) + i]))
                     training_accuracy_plt_data.stream(
-                        dict(y=[running_training_accuracy],
+                        dict(y=[avg_acc],
                              x=[epoch * len(self.trainloader) + i]))
                     push_notebook(handle=training_handle)
 
@@ -260,6 +269,13 @@ class Solver:
                     self.print_and_buffer(
                         '[%5d, %9s] %13s | %17.8f' %
                         (epoch + 1, "finished", "accuracy:", val_accuracy))
+
+                epoch_training_plt_data.stream(
+                    dict(y=[self.per_iteration_train_acc_history[-1]],
+                         x=[epoch + 1]))
+                epoch_validation_plt_data.stream(
+                    dict(y=[val_accuracy], x=[epoch + 1]))
+                push_notebook(handle=epoch_handle)
 
             if self.verbose:
                 self.print_and_buffer()
