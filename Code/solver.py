@@ -81,11 +81,11 @@ class Solver:
         if self.validationloader:
             self.best_val_acc = 0
             self.best_params = self.model.parameters()
-            self.val_acc_history = []
+            self.val_acc_history = [0]
 
         self.loss_history = {}
         self.per_iteration_train_acc_history = {}
-        self.per_epoch_train_acc_history = []
+        self.per_epoch_train_acc_history = [0]
 
         # Make a deep copy of the optim_config for each parameter
         # self.optim_configs = {}
@@ -150,13 +150,12 @@ class Solver:
                     avg_loss = running_loss / log_every
                     avg_acc = running_training_accuracy / log_every
 
-                    total_iteration = epoch * log_every
+                    total_iteration = epoch * len(self.trainloader) + i
                     self.loss_history[total_iteration] = avg_loss
                     self.per_iteration_train_acc_history[
                         total_iteration] = avg_acc
 
                     if self.plot:
-                        total_iteration = epoch * len(self.trainloader) + i
                         self.plotter.append_training_loss(
                             total_iteration, avg_loss)
                         self.plotter.append_training_accuracy(
@@ -167,12 +166,12 @@ class Solver:
 
                     self.printer.print_and_buffer(
                         '[%5d, %9d] %13.8f | %17.8f' %
-                        (epoch, i + 1, avg_loss, avg_acc))
+                        (epoch + 1, i + 1, avg_loss, avg_acc))
 
             self.per_epoch_train_acc_history.append(avg_acc)
 
             if self.plot:
-                self.plotter.append_epoch_training_accuracy(epoch, avg_acc)
+                self.plotter.append_epoch_training_accuracy(epoch + 1, avg_acc)
 
             if self.validationloader:
                 # Validation stuff
@@ -201,7 +200,7 @@ class Solver:
 
                 if self.plot:
                     self.plotter.append_epoch_validation_accuracy(
-                        epoch, val_accuracy)
+                        epoch + 1, val_accuracy)
 
             self.printer.print_and_buffer()
 
