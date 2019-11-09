@@ -81,11 +81,11 @@ class Solver:
         if self.validationloader:
             self.best_val_acc = 0
             self.best_params = self.model.parameters()
-            self.val_acc_history = [0]
+            self.val_acc_history = []
 
-        self.loss_history = [np.nan]
-        self.per_iteration_train_acc_history = [0]
-        self.per_epoch_train_acc_history = [0]
+        self.loss_history = {}
+        self.per_iteration_train_acc_history = {}
+        self.per_epoch_train_acc_history = []
 
         # Make a deep copy of the optim_config for each parameter
         # self.optim_configs = {}
@@ -142,9 +142,6 @@ class Solver:
                 train_acc = (predicted_train_labels == labels
                              ).sum().item() / len(predicted_train_labels)
 
-                self.loss_history.append(np.nan)
-                self.per_iteration_train_acc_history.append(np.nan)
-
                 # print statistics
                 running_loss += loss.item()
                 running_training_accuracy += train_acc
@@ -153,10 +150,10 @@ class Solver:
                     avg_loss = running_loss / log_every
                     avg_acc = running_training_accuracy / log_every
 
-                    del self.loss_history[-1]
-                    self.loss_history.append(avg_loss)
-                    del self.per_iteration_train_acc_history[-1]
-                    self.per_iteration_train_acc_history.append(avg_acc)
+                    total_iteration = epoch * log_every
+                    self.loss_history[total_iteration] = avg_loss
+                    self.per_iteration_train_acc_history[
+                        total_iteration] = avg_acc
 
                     if self.plot:
                         total_iteration = epoch * len(self.trainloader) + i
@@ -170,12 +167,12 @@ class Solver:
 
                     self.printer.print_and_buffer(
                         '[%5d, %9d] %13.8f | %17.8f' %
-                        (epoch + 1, i + 1, avg_loss, avg_acc))
+                        (epoch, i + 1, avg_loss, avg_acc))
 
             self.per_epoch_train_acc_history.append(avg_acc)
 
             if self.plot:
-                self.plotter.append_epoch_training_accuracy(epoch + 1, avg_acc)
+                self.plotter.append_epoch_training_accuracy(epoch, avg_acc)
 
             if self.validationloader:
                 # Validation stuff
@@ -200,11 +197,11 @@ class Solver:
                 self.printer.print_and_buffer(len(header) * "-")
                 self.printer.print_and_buffer(
                     '[%5d, %9s] %13s | %17.8f' %
-                    (epoch + 1, "finished", "accuracy:", val_accuracy))
+                    (epoch, "finished", "accuracy:", val_accuracy))
 
                 if self.plot:
                     self.plotter.append_epoch_validation_accuracy(
-                        epoch + 1, val_accuracy)
+                        epoch, val_accuracy)
 
             self.printer.print_and_buffer()
 
