@@ -1,6 +1,9 @@
 """
 Nice solver my Marcel Bruckner.
 """
+import os
+
+import _pickle as cPickle
 import numpy as np
 import torch
 import torchvision
@@ -21,10 +24,12 @@ class Solver:
                  criterion='cross_entropy_loss',
                  optim_config={},
                  lr_decay=1.0,
-                 num_epochs=10,
-                 verbose=True,
-                 log_every=100,
-                 plot=False):
+                 best_val_acc=0,
+                 val_acc_history={},
+                 loss_history={},
+                 per_iteration_train_acc_history={},
+                 per_epoch_train_acc_history={},
+                 log_buffer=""):
         """
         Constructor
 
@@ -51,74 +56,74 @@ class Solver:
             "cuda:0" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
 
-        self.optimizer = optim
+        self.optim = optim
         self.criterion = criterion
         self.optim_config = optim_config
         self.lr_decay = lr_decay
-        self.num_epochs = num_epochs
-
-        self.verbose = verbose
-        self.log_every = log_every
-        self.plot = plot
 
         if not hasattr(optimizer, self.criterion):
             raise ValueError('Invalid criterion "%s"' % self.criterion)
         self.criterion = getattr(optimizer, self.criterion)
 
-        if not hasattr(optimizer, self.optimizer):
-            raise ValueError('Invalid optimizer "%s"' % self.optimizer)
-        self.optimizer = getattr(optimizer, self.optimizer)
+        if not hasattr(optimizer, self.optim):
+            raise ValueError('Invalid optimizer "%s"' % self.optim)
+        self.optim = getattr(optimizer, self.optim)
 
-        self._reset()
-
-    def _reset(self):
-        """
-        Set up some book-keeping variables for optimization. Don't call this
-        manually.
-        """
         # Set up some variables for book-keeping
 
-        if self.validationloader:
-            self.best_val_acc = 0
-            self.best_params = self.model.parameters()
-            self.val_acc_history = [0]
+        self.best_val_acc = best_val_acc
+        self.best_params = self.model.parameters()
+        self.val_acc_history = val_acc_history
 
-        self.loss_history = {}
-        self.per_iteration_train_acc_history = {}
-        self.per_epoch_train_acc_history = [0]
+        self.loss_history = loss_history
+        self.per_iteration_train_acc_history = per_iteration_train_acc_history
+        self.per_epoch_train_acc_history = per_epoch_train_acc_history
 
-        # Make a deep copy of the optim_config for each parameter
-        # self.optim_configs = {}
-        # for p in self.model.params:
-        # d = {k: v for k, v in self.optim_config.items()}
-        # self.optim_configs[p] = d
+        self.log_buffer = log_buffer
 
-    def train(self):
+    def train(self,
+              optim_config={},
+              lr_decay=0,
+              num_epochs=10,
+              verbose=True,
+              log_every=100,
+              plot=False):
         """ Trains the network.
         Iterates over the trainings data num_epochs time and performs gradient descent
         based on the optimizer.
         """
 
-        self.printer = SolverPrinter(self.verbose)
+        if not self.val_acc_history:
+            self.val_acc_history[0] = 0
 
-        log_every = min(self.log_every, len(self.trainloader) - 1)
+        if not self.per_epoch_train_acc_history:
+            self.per_epoch_train_acc_history[0] = 0
 
-        if self.plot:
-            self.plotter = SolverPlotter(self)
+        if not optim_config:
+            optim_config = self.optim_config
+
+        if not lr_decay:
+            lr_decay = self.lr_decay
+
+        log_every = min(log_every, len(self.trainloader) - 1)
+
+        if plot:
+            plotter = SolverPlotter(self)
 
         device = self.device
         header = "[epoch, iteration] training loss | training accuracy"
 
-        optim_config = self.optim_config
+        previous_epochs = np.max(list(self.per_epoch_train_acc_history.keys()))
 
-        for epoch in range(
-                self.num_epochs):  # loop over the dataset multiple times
+        for epoch in range(num_epochs):  # loop over the dataset multiple times
 
-            self.printer.print_and_buffer(header)
-            self.printer.print_and_buffer(len(header) * "-")
+            total_epoch = epoch + previous_epochs + 1
 
-            optimizer, next_lr = self.optimizer(self.model.parameters(),
-                                                optim_config)
+            self.print_and_buffer(header, verbose)
+            self.print_and_buffer(len(header) * "-", verbose)
+
+            optimizer, next_lr = self.optim(self.model.parameters(),
+                                            optim_config)
             optim_config['lr'] = next_lr
             criterion = self.criterion()
 
@@ -150,28 +155,28 @@ class Solver:
                     avg_loss = running_loss / log_every
                     avg_acc = running_training_accuracy / log_every
 
-                    total_iteration = epoch * len(self.trainloader) + i
+                    total_iteration = (total_epoch - 1) * \
+                        len(self.trainloader) + i
                     self.loss_history[total_iteration] = avg_loss
                     self.per_iteration_train_acc_history[
                         total_iteration] = avg_acc
 
-                    if self.plot:
-                        self.plotter.append_training_loss(
-                            total_iteration, avg_loss)
-                        self.plotter.append_training_accuracy(
+                    if plot:
+                        plotter.append_training_loss(total_iteration, avg_loss)
+                        plotter.append_training_accuracy(
                             total_iteration, avg_acc)
 
                     running_loss = 0.0
                     running_training_accuracy = 0.0
 
-                    self.printer.print_and_buffer(
+                    self.print_and_buffer(
                         '[%5d, %9d] %13.8f | %17.8f' %
-                        (epoch + 1, i + 1, avg_loss, avg_acc))
+                        (total_epoch, i + 1, avg_loss, avg_acc), verbose)
 
-            self.per_epoch_train_acc_history.append(avg_acc)
+            self.per_epoch_train_acc_history[total_epoch] = avg_acc
 
-            if self.plot:
-                self.plotter.append_epoch_training_accuracy(epoch + 1, avg_acc)
+            if plot:
+                plotter.append_epoch_training_accuracy(total_epoch, avg_acc)
 
             if self.validationloader:
                 # Validation stuff
@@ -187,22 +192,25 @@ class Solver:
                             predicted_val_labels == labels).sum().item()
 
                 val_accuracy = correct_validation_samples / total_validation_samples
-                self.val_acc_history.append(val_accuracy)
+                self.val_acc_history[total_epoch] = val_accuracy
 
                 if val_accuracy > self.best_val_acc:
                     self.best_val_acc = val_accuracy
                     self.best_params = self.model.state_dict()
 
-                self.printer.print_and_buffer(len(header) * "-")
-                self.printer.print_and_buffer(
+                    for k, v in self.best_params.items():
+                        self.best_params[k] = v.cpu()
+
+                self.print_and_buffer(len(header) * "-", verbose)
+                self.print_and_buffer(
                     '[%5d, %9s] %13s | %17.8f' %
-                    (epoch, "finished", "accuracy:", val_accuracy))
+                    (epoch, "finished", "accuracy:", val_accuracy), verbose)
 
-                if self.plot:
-                    self.plotter.append_epoch_validation_accuracy(
-                        epoch + 1, val_accuracy)
+                if plot:
+                    plotter.append_epoch_validation_accuracy(
+                        total_epoch, val_accuracy)
 
-            self.printer.print_and_buffer()
+            self.print_and_buffer(verbose=verbose)
 
     def save_model(self, filename='model.pth'):
         """ Saves the model parameters.
@@ -220,12 +228,16 @@ class Solver:
         print_class_accuracies(self, classes)
 
     def print_log(self):
-        print(self.printer.buffer)
+        print(self.log_buffer)
 
     def print_bokeh_plots(self):
         print_bokeh_plots(self)
 
-    # Visualization
+    def print_and_buffer(self, message="", verbose=False):
+        self.log_buffer += message + "\n"
+
+        if verbose:
+            print(message)
 
     def predict_samples(self, classes=None, num_samples=8):
         """ Picks some random samples from the validation data and predicts the labels.
@@ -265,3 +277,26 @@ class Solver:
                     '%10s: %s' %
                     ('Predicted', ' '.join('%8s' % predicted[j].item()
                                            for j in range(real_num_samples))))
+
+    def save_solver(self, filename='history.pth', dir='solvers'):
+        output_dict = dict(self.__dict__)
+
+        del output_dict['device']
+        del output_dict['best_params']
+
+        output_dict['model'].cpu()
+        output_dict['criterion'] = output_dict['criterion'].__name__
+        output_dict['optim'] = output_dict['optim'].__name__
+
+        print(output_dict)
+
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        cPickle.dump(output_dict, open(dir + '/' + filename, 'wb'), 2)
+
+
+def load_solver(filename='history.pth', dir='solvers'):
+    data = cPickle.load(open(dir + '/' + filename, 'rb'))
+    print(data)
+
+    return Solver(**data)

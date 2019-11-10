@@ -13,14 +13,7 @@ from IPython import display
 
 class SolverPrinter:
     def __init__(self, verbose=False):
-        self.buffer = ""
         self.verbose = verbose
-
-    def print_and_buffer(self, message=""):
-        self.buffer += message + "\n"
-
-        if self.verbose:
-            print(message)
 
 
 def print_class_accuracies(solver, classes=None):
@@ -102,8 +95,8 @@ class SolverPlotter:
                             title='Accuracy',
                             x_axis_label='Epoch')
         epoch_training_plt_data = ColumnDataSource(
-            data=dict(x=list(range(len(solver.per_epoch_train_acc_history))),
-                      y=np.array(solver.per_epoch_train_acc_history)))
+            data=dict(x=list(solver.per_epoch_train_acc_history.keys()),
+                      y=list(solver.per_epoch_train_acc_history.values())))
         epoch_plot.line('x',
                         'y',
                         source=epoch_training_plt_data,
@@ -120,8 +113,8 @@ class SolverPlotter:
 
         if solver.validationloader is not None:
             epoch_validation_plt_data = ColumnDataSource(
-                data=dict(x=list(range(len(solver.val_acc_history))),
-                          y=np.array(solver.val_acc_history)))
+                data=dict(x=list(solver.val_acc_history.keys()),
+                          y=list(solver.val_acc_history.values())))
             epoch_plot.circle('x',
                               'y',
                               source=epoch_validation_plt_data,
