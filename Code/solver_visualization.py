@@ -99,14 +99,14 @@ class SolverPlotter:
                         source=epoch_training_plt_data,
                         line_color='orange',
                         line_width=2,
-                        legend='Training')
+                        legend_label='Training')
         epoch_plot.circle('x',
                           'y',
                           source=epoch_training_plt_data,
                           line_color='orange',
                           fill_color='orange',
                           line_width=2,
-                          legend='Training')
+                          legend_label='Training')
 
         if solver.validationloader is not None:
             epoch_validation_plt_data = ColumnDataSource(
@@ -118,13 +118,14 @@ class SolverPlotter:
                               line_color='green',
                               fill_color='green',
                               line_width=2,
-                              legend='Validation')
+                              legend_label='Validation')
             epoch_plot.line('x',
                             'y',
                             source=epoch_validation_plt_data,
                             line_color='green',
                             line_width=2,
-                            legend='Validation')
+                            legend_label='Validation')
+            epoch_plot.legend.click_policy = 'hide'
 
         epoch_plot.legend.location = 'bottom_right'
         epoch_handle = show(epoch_plot, notebook_handle=True)
