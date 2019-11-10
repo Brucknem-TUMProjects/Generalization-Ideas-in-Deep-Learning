@@ -19,7 +19,20 @@ class ExampleNet(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
+
         return x
 
-    def loss_function():
+    def loss_function(self):
         return "l2"
+
+
+def extract_per_layer_weights(model):
+    layers = {}
+
+    for k, v in model._modules.items():
+        try:
+            layers[k] = model.params[k + '.weight'].cpu().numpy()
+        except:
+            print('Layer "' + k + '" has no weights')
+
+    return layers
