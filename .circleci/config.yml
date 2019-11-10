@@ -1,15 +1,15 @@
- version: 2
- jobs:
-   build:
-     docker:
-       - image: circleci/python:buster
-     steps:
-       - checkout
-       - run: echo "A first hello"
-   build:
-     docker:
-       - image: circleci/python:buster
-     steps:
-       - checkout
-       - run: echo "A first hello"
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/python:buster
+    steps:
+      - checkout
+      - run: echo "A first hello"
+  build:
+    docker:
+      - image: circleci/python:buster
+    steps:
+      - checkout
+      - run: echo "A first hello"
 
