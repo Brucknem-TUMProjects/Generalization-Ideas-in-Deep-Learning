@@ -137,6 +137,7 @@ class Solver:
 
             running_loss = 0.0
             running_training_accuracy = 0.0
+            epoch_running_training_accuracy = 0.0
 
             for i, data in enumerate(self.trainloader, 0):
                 # get the inputs; data is a list of [inputs, labels]
@@ -158,6 +159,7 @@ class Solver:
                 # print statistics
                 running_loss += loss.item()
                 running_training_accuracy += train_acc
+                epoch_running_training_accuracy += train_acc
 
                 if i % log_every == (log_every - 1):
                     avg_loss = running_loss / log_every
@@ -181,10 +183,13 @@ class Solver:
                         '[%5d, %9d] %13.8f | %17.8f' %
                         (total_epoch, i + 1, avg_loss, avg_acc), verbose)
 
-            self.per_epoch_train_acc_history[total_epoch] = avg_acc
+            epoch_train_acc = epoch_running_training_accuracy / \
+                len(self.trainloader)
+            self.per_epoch_train_acc_history[total_epoch] = epoch_train_acc
 
             if plot:
-                plotter.append_epoch_training_accuracy(total_epoch, avg_acc)
+                plotter.append_epoch_training_accuracy(total_epoch,
+                                                       epoch_train_acc)
 
             if self.validationloader:
                 # Validation stuff
