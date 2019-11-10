@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -190,71 +189,3 @@ def print_bokeh_plots(solver):
     self = SolverPlotter(solver)
 
     return
-
-    p = figure(plot_height=400,
-               plot_width=900,
-               title="Training",
-               x_axis_label="Iteration")
-
-    p.line(x=range(len(solver.loss_history)),
-           y=solver.loss_history,
-           legend="Loss",
-           line_color="red",
-           line_width=2)
-    p.y_range = Range1d(0, np.nanmax(solver.loss_history))
-
-    p.extra_y_ranges = {
-        'Accuracy': Range1d(0,
-                            np.nanmax(solver.per_iteration_train_acc_history))
-    }
-    p.add_layout(LinearAxis(y_range_name='Accuracy'), 'right')
-    p.line(x=range(len(solver.per_iteration_train_acc_history)),
-           y=solver.per_iteration_train_acc_history,
-           legend="Accuracy",
-           line_color="blue",
-           line_width=2,
-           y_range_name='Accuracy')
-
-    show(p)
-
-    p = figure(plot_height=400,
-               plot_width=900,
-               title="Accuracy",
-               x_axis_label="Accuracy")
-
-    p.circle(x=range(len(solver.per_epoch_train_acc_history)),
-             y=solver.per_epoch_train_acc_history,
-             legend="Training",
-             line_color="red",
-             line_width=2)
-    p.line(x=range(len(solver.per_epoch_train_acc_history)),
-           y=solver.per_epoch_train_acc_history,
-           legend="Training",
-           line_color="red",
-           line_width=2)
-    p.y_range = Range1d(0, np.nanmax(solver.per_epoch_train_acc_history))
-
-    p.extra_y_ranges = {
-        'Validation': Range1d(0, np.nanmax(solver.val_acc_history))
-    }
-    p.add_layout(LinearAxis(y_range_name='Validation'), 'right')
-    p.circle(x=range(len(solver.val_acc_history)),
-             y=solver.val_acc_history,
-             legend="Validation",
-             line_color="blue",
-             line_width=2,
-             y_range_name='Validation')
-    p.line(x=range(len(solver.val_acc_history)),
-           y=solver.val_acc_history,
-           legend="Validation",
-           line_color="blue",
-           line_width=2,
-           y_range_name='Validation')
-
-    show(p)
-
-
-# def update_plot(self):
-#     display.clear_output(wait=True)
-#     self.print_plots()
-#     print(self.output_buffer)
