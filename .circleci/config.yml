@@ -1,0 +1,8 @@
+ version: 2
+ jobs:
+   build:
+     docker:
+       - image: circleci/python:buster
+     steps:
+       - checkout
+       - run: python project/Code/norms_test.py
