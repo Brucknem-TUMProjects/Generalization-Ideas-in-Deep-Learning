@@ -1,6 +1,6 @@
  version: 2
  jobs:
-   one:
+   build:
      docker:
        - image: circleci/python:buster
      steps:
