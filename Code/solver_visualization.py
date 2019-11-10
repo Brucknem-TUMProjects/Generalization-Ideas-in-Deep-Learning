@@ -1,8 +1,6 @@
-import pprint
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
 from bokeh.io import output_notebook, push_notebook, show
 from bokeh.layouts import row

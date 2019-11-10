@@ -1,6 +1,7 @@
 """
 Nice solver my Marcel Bruckner.
 """
+import copy
 import os
 
 import _pickle as cPickle
@@ -10,6 +11,7 @@ import torchvision
 from IPython import display
 
 import data_visualization
+import helpers
 import optimizer
 from solver_visualization import *
 
@@ -29,7 +31,8 @@ class Solver:
                  loss_history={},
                  per_iteration_train_acc_history={},
                  per_epoch_train_acc_history={},
-                 log_buffer=""):
+                 log_buffer="",
+                 best_solver=None):
         """
         Constructor
 
@@ -63,16 +66,17 @@ class Solver:
 
         if not hasattr(optimizer, self.criterion):
             raise ValueError('Invalid criterion "%s"' % self.criterion)
-        self.criterion = getattr(optimizer, self.criterion)
+        self.criterion_func = getattr(optimizer, self.criterion)
 
         if not hasattr(optimizer, self.optim):
             raise ValueError('Invalid optimizer "%s"' % self.optim)
-        self.optim = getattr(optimizer, self.optim)
+        self.optim_func = getattr(optimizer, self.optim)
 
         # Set up some variables for book-keeping
 
         self.best_val_acc = best_val_acc
         self.best_params = self.model.parameters()
+        self.best_solver = best_solver
         self.val_acc_history = val_acc_history
 
         self.loss_history = loss_history
@@ -92,6 +96,8 @@ class Solver:
         Iterates over the trainings data num_epochs time and performs gradient descent
         based on the optimizer.
         """
+
+        torch.cuda.empty_cache()
 
         if not self.val_acc_history:
             self.val_acc_history[0] = 0
@@ -113,6 +119,8 @@ class Solver:
         device = self.device
         header = "[epoch, iteration] training loss | training accuracy"
 
+        self.model.to(device)
+
         previous_epochs = np.max(list(self.per_epoch_train_acc_history.keys()))
 
         for epoch in range(num_epochs):  # loop over the dataset multiple times
@@ -122,10 +130,10 @@ class Solver:
             self.print_and_buffer(header, verbose)
             self.print_and_buffer(len(header) * "-", verbose)
 
-            optimizer, next_lr = self.optim(self.model.parameters(),
-                                            optim_config)
+            optimizer, next_lr = self.optim_func(self.model.parameters(),
+                                                 optim_config)
             optim_config['lr'] = next_lr
-            criterion = self.criterion()
+            criterion = self.criterion_func()
 
             running_loss = 0.0
             running_training_accuracy = 0.0
@@ -197,9 +205,10 @@ class Solver:
                 if val_accuracy > self.best_val_acc:
                     self.best_val_acc = val_accuracy
                     self.best_params = self.model.state_dict()
+                    self.best_solver = Solver(**(self.to_output_dict(False)))
 
-                    for k, v in self.best_params.items():
-                        self.best_params[k] = v.cpu()
+                    # for k, v in self.best_params.items():
+                    #   self.best_params[k] = v.cpu()
 
                 self.print_and_buffer(len(header) * "-", verbose)
                 self.print_and_buffer(
@@ -212,6 +221,10 @@ class Solver:
                         total_epoch, val_accuracy)
 
             self.print_and_buffer(verbose=verbose)
+
+        # At the end of training swap the best params into the model
+        self.model.params = self.best_params
+        torch.cuda.empty_cache()
 
     def save_model(self, filename='model.pth'):
         """ Saves the model parameters.
@@ -239,6 +252,15 @@ class Solver:
 
         if verbose:
             print(message)
+
+    def debug_sizes(self):
+        print("%31s: %15s" %
+              ("Epoch " + str(total_epoch), helpers.get_size(self)))
+
+        for k, v in self.__dict__.items():
+            print("%31s: %15d" % (k, helpers.get_size(v)))
+
+        print(80 * "*")
 
     def predict_samples(self, classes=None, num_samples=8):
         """ Picks some random samples from the validation data and predicts the labels.
@@ -279,22 +301,39 @@ class Solver:
                     ('Predicted', ' '.join('%8s' % predicted[j].item()
                                            for j in range(real_num_samples))))
 
-    def save_solver(self, filename='history.pth', dir='solvers'):
-        output_dict = dict(self.__dict__)
+    def save_best_solver(self, filename='best.pth', dir='solvers'):
+        save_solver(self.best_solver, filename, dir)
 
-        del output_dict['device']
-        del output_dict['best_params']
+    def save_solver(self, filename='current.pth', dir='solvers'):
+        save_solver(self, filename, dir)
 
-        output_dict['model'].cpu()
-        output_dict['criterion'] = output_dict['criterion'].__name__
-        output_dict['optim'] = output_dict['optim'].__name__
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
 
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        cPickle.dump(output_dict, open(dir + '/' + filename, 'wb'), 2)
+        for k, v in self.__dict__.items():
+            if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_solver' or k is 'best_params':
+                continue
+            setattr(result, k, copy.deepcopy(v, memo))
+
+        return result
+
+    def to_output_dict(self, with_best_solver=True):
+        output_dict = copy.deepcopy(self)
+
+        return dict(output_dict.__dict__)
 
 
-def load_solver(filename='history.pth', dir='solvers'):
+def save_solver(solver, filename='current.pth', dir='solvers'):
+    output_dict = solver.to_output_dict()
+
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    cPickle.dump(dict(output_dict), open(dir + '/' + filename, 'wb'), 2)
+
+
+def load_solver(filename='current.pth', dir='solvers'):
     data = cPickle.load(open(dir + '/' + filename, 'rb'))
 
     return Solver(**data)
