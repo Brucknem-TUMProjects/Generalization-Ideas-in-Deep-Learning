@@ -204,7 +204,8 @@ class Solver:
                 self.print_and_buffer(len(header) * "-", verbose)
                 self.print_and_buffer(
                     '[%5d, %9s] %13s | %17.8f' %
-                    (epoch, "finished", "accuracy:", val_accuracy), verbose)
+                    (total_epoch, "finished", "accuracy:", val_accuracy),
+                    verbose)
 
                 if plot:
                     plotter.append_epoch_validation_accuracy(
@@ -288,8 +289,6 @@ class Solver:
         output_dict['criterion'] = output_dict['criterion'].__name__
         output_dict['optim'] = output_dict['optim'].__name__
 
-        print(output_dict)
-
         if not os.path.exists(dir):
             os.makedirs(dir)
         cPickle.dump(output_dict, open(dir + '/' + filename, 'wb'), 2)
@@ -297,6 +296,5 @@ class Solver:
 
 def load_solver(filename='history.pth', dir='solvers'):
     data = cPickle.load(open(dir + '/' + filename, 'rb'))
-    print(data)
 
     return Solver(**data)
