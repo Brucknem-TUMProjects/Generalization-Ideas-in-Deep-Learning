@@ -7,7 +7,7 @@ import os
 
 import data_loader
 import data_visualization
-import networks.networks as networks
+import networks
 from solver import *
 
 # initiate the parser
