@@ -1,6 +1,7 @@
 # DL stuff
 data/
 cifar*
+*.sbatch
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
