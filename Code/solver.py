@@ -90,7 +90,11 @@ class Solver:
               num_epochs=10,
               verbose=True,
               log_every=100,
-              plot=False):
+              plot=False,
+              save_after_epoch=False,
+              save_best_solver=True,
+              filename='latest.pth',
+              folder='solvers/'):
         """ Trains the network.
         Iterates over the trainings data num_epochs time and performs gradient descent
         based on the optimizer.
@@ -216,6 +220,9 @@ class Solver:
                     self.best_params = self.model.state_dict()
                     self.best_solver = Solver(**(self.to_output_dict(False)))
 
+                    if save_best_solver:
+                        self.save_best_solver(folder=folder,
+                                              filename=filename + '.best.pth')
                     # for k, v in self.best_params.items():
                     #   self.best_params[k] = v.cpu()
 
@@ -230,6 +237,7 @@ class Solver:
                         total_epoch, val_accuracy)
 
             self.print_and_buffer(verbose=verbose)
+            self.save_solver()
 
         # At the end of training swap the best params into the model
         self.model.params = self.best_params
@@ -327,6 +335,7 @@ class Solver:
                 continue
 
             setattr(result, k, copy.deepcopy(v, memo))
+
         return result
 
     def to_output_dict(self, with_best_solver=True):

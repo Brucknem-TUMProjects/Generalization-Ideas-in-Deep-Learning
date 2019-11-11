@@ -67,7 +67,7 @@ NUM_EPOCHS = 5
 PARSER.add_argument("--num_epochs",
                     help="specify the number of epochs (default: %s)" %
                     NUM_EPOCHS)
-LOG_EVERY = 50 
+LOG_EVERY = 50
 PARSER.add_argument(
     "--log_every",
     help=
@@ -122,7 +122,11 @@ def train():
     solver.train(num_epochs=NUM_EPOCHS,
                  log_every=LOG_EVERY,
                  plot=PLOT,
-                 verbose=VERBOSE)
+                 verbose=VERBOSE,
+                 save_after_epoch=True,
+                 save_best_solver=True,
+                 folder=FOLDER,
+                 filename=FILENAME)
     print(80 * "*" + "\n")
     print("Saving solver!")
     solver.save_solver()
