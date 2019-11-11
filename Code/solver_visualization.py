@@ -108,24 +108,23 @@ class SolverPlotter:
                           line_width=2,
                           legend_label='Training')
 
-        if solver.validationloader is not None:
-            epoch_validation_plt_data = ColumnDataSource(
-                data=dict(x=list(solver.val_acc_history.keys()),
-                          y=list(solver.val_acc_history.values())))
-            epoch_plot.circle('x',
-                              'y',
-                              source=epoch_validation_plt_data,
-                              line_color='green',
-                              fill_color='green',
-                              line_width=2,
-                              legend_label='Validation')
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_validation_plt_data,
-                            line_color='green',
-                            line_width=2,
-                            legend_label='Validation')
-            epoch_plot.legend.click_policy = 'hide'
+        epoch_validation_plt_data = ColumnDataSource(
+            data=dict(x=list(solver.val_acc_history.keys()),
+                      y=list(solver.val_acc_history.values())))
+        epoch_plot.circle('x',
+                          'y',
+                          source=epoch_validation_plt_data,
+                          line_color='green',
+                          fill_color='green',
+                          line_width=2,
+                          legend_label='Validation')
+        epoch_plot.line('x',
+                        'y',
+                        source=epoch_validation_plt_data,
+                        line_color='green',
+                        line_width=2,
+                        legend_label='Validation')
+        epoch_plot.legend.click_policy = 'hide'
 
         epoch_plot.legend.location = 'bottom_right'
         epoch_handle = show(epoch_plot, notebook_handle=True)
@@ -188,5 +187,3 @@ def print_bokeh_plots(solver):
     output_notebook()
 
     self = SolverPlotter(solver)
-
-    return

@@ -20,7 +20,7 @@ class Solver:
     """ This class trains the given NN model. """
     def __init__(self,
                  model,
-                 trainloader,
+                 trainloader=None,
                  validationloader=None,
                  optim='adam',
                  criterion='cross_entropy_loss',
@@ -96,6 +96,11 @@ class Solver:
         Iterates over the trainings data num_epochs time and performs gradient descent
         based on the optimizer.
         """
+
+        if not self.trainloader:
+            raise ValueError(
+                'There is no trainloader specified. Please set one via solver.trainloader = <torch.utils.data.DataLoader>'
+            )
 
         torch.cuda.empty_cache()
 
@@ -309,7 +314,7 @@ class Solver:
     def save_best_solver(self, filename='best.pth', dir='solvers'):
         save_solver(self.best_solver, filename, dir)
 
-    def save_solver(self, filename='current.pth', dir='solvers'):
+    def save_solver(self, filename='latest.pth', dir='solvers'):
         save_solver(self, filename, dir)
 
     def __deepcopy__(self, memo):
@@ -318,7 +323,7 @@ class Solver:
         memo[id(self)] = result
 
         for k, v in self.__dict__.items():
-            if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_solver' or k is 'best_params':
+            if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_solver' or k is 'best_params' or k is 'trainloader' or k is 'validationloader':
                 continue
             setattr(result, k, copy.deepcopy(v, memo))
 
@@ -329,8 +334,15 @@ class Solver:
 
         return dict(output_dict.__dict__)
 
+    def get_best_solver_with_loaders(self):
+        best_solver = self.best_solver
+        best_solver.trainloader = self.trainloader
+        best_solver.validationloader = self.validationloader
 
-def save_solver(solver, filename='current.pth', dir='solvers'):
+        return best_solver
+
+
+def save_solver(solver, filename='latest.pth', dir='solvers'):
     output_dict = solver.to_output_dict()
 
     if not os.path.exists(dir):
@@ -338,7 +350,13 @@ def save_solver(solver, filename='current.pth', dir='solvers'):
     cPickle.dump(dict(output_dict), open(dir + '/' + filename, 'wb'), 2)
 
 
-def load_solver(filename='current.pth', dir='solvers'):
+def load_solver(trainloader=None,
+                validationloader=None,
+                filename='latest.pth',
+                dir='solvers'):
     data = cPickle.load(open(dir + '/' + filename, 'rb'))
+
+    data['trainloader'] = trainloader
+    data['validationloader'] = validationloader
 
     return Solver(**data)
