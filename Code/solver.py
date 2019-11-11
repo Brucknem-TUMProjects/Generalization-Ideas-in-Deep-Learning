@@ -74,7 +74,7 @@ class Solver:
         # Set up some variables for book-keeping
 
         self.best_val_acc = best_val_acc
-        self.best_params = self.model.parameters()
+        self.best_params = None
         self.best_solver = best_solver
         self.val_acc_history = val_acc_history
 
@@ -111,9 +111,6 @@ class Solver:
 
         if not optim_config:
             optim_config = self.optim_config
-
-        if not lr_decay:
-            lr_decay = self.lr_decay
 
         log_every = min(log_every, len(self.trainloader) - 1)
 
@@ -236,6 +233,7 @@ class Solver:
 
         # At the end of training swap the best params into the model
         self.model.params = self.best_params
+        self.model.cpu()
         torch.cuda.empty_cache()
 
     def save_model(self, filename='model.pth'):
@@ -327,8 +325,8 @@ class Solver:
         for k, v in self.__dict__.items():
             if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_solver' or k is 'best_params' or k is 'trainloader' or k is 'validationloader':
                 continue
-            setattr(result, k, copy.deepcopy(v, memo))
 
+            setattr(result, k, copy.deepcopy(v, memo))
         return result
 
     def to_output_dict(self, with_best_solver=True):
