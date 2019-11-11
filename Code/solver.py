@@ -57,7 +57,6 @@ class Solver:
         """ The device used for calculation. CUDA or CPU. """
         self.device = torch.device(
             "cuda:0" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
 
         self.optim = optim
         self.criterion = criterion
@@ -122,6 +121,9 @@ class Solver:
             plotter = SolverPlotter(self)
 
         device = self.device
+
+        print("Using device: %s\n" % device)
+
         header = "[epoch, iteration] training loss | training accuracy"
 
         self.model.to(device)
@@ -263,14 +265,14 @@ class Solver:
         if verbose:
             print(message)
 
-    def debug_sizes(self):
-        print("%31s: %15s" %
-              ("Epoch " + str(total_epoch), helpers.get_size(self)))
-
-        for k, v in self.__dict__.items():
-            print("%31s: %15d" % (k, helpers.get_size(v)))
-
-        print(80 * "*")
+    # def debug_sizes(self):
+    #     print("%31s: %15s" %
+    #           ("Epoch " + str(total_epoch), helpers.get_size(self)))
+    #
+    #     for k, v in self.__dict__.items():
+    #         print("%31s: %15d" % (k, helpers.get_size(v)))
+    #
+    #     print(80 * "*")
 
     def predict_samples(self, classes=None, num_samples=8):
         """ Picks some random samples from the validation data and predicts the labels.
@@ -311,11 +313,11 @@ class Solver:
                     ('Predicted', ' '.join('%8s' % predicted[j].item()
                                            for j in range(real_num_samples))))
 
-    def save_best_solver(self, filename='best.pth', dir='solvers'):
-        save_solver(self.best_solver, filename, dir)
+    def save_best_solver(self, filename='best.pth', folder='solvers'):
+        save_solver(self.best_solver, filename, folder)
 
-    def save_solver(self, filename='latest.pth', dir='solvers'):
-        save_solver(self, filename, dir)
+    def save_solver(self, filename='latest.pth', folder='solvers'):
+        save_solver(self, filename, folder)
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -342,19 +344,23 @@ class Solver:
         return best_solver
 
 
-def save_solver(solver, filename='latest.pth', dir='solvers'):
+def save_solver(solver, filename='latest.pth', folder='solvers'):
     output_dict = solver.to_output_dict()
 
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    cPickle.dump(dict(output_dict), open(dir + '/' + filename, 'wb'), 2)
+    folder = folder if folder.endswith('/') else folder + '/'
+
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    cPickle.dump(dict(output_dict), open(folder + filename, 'wb'), 2)
 
 
 def load_solver(trainloader=None,
                 validationloader=None,
                 filename='latest.pth',
-                dir='solvers'):
-    data = cPickle.load(open(dir + '/' + filename, 'rb'))
+                folder='solvers'):
+    folder = folder if folder.endswith('/') else folder + '/'
+    data = cPickle.load(open(folder + filename, 'rb'))
 
     data['trainloader'] = trainloader
     data['validationloader'] = validationloader

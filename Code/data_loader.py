@@ -11,6 +11,18 @@ _default_transform = transforms.Compose([
 ])
 
 
+def cifar10(train, batch_size, subset_size, random_labels):
+
+    if train:
+        return get_CIFAR10_trainset_loader(batch_size=batch_size,
+                                           subset_size=subset_size,
+                                           random_labels=random_labels)
+
+    return get_CIFAR10_testset_loader(batch_size=batch_size,
+                                      subset_size=subset_size,
+                                      random_labels=random_labels)
+
+
 def load_CIFAR10_dataset(train,
                          download=True,
                          transform=_default_transform,
