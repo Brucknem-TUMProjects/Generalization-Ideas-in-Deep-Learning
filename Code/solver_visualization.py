@@ -1,3 +1,4 @@
+import bokeh
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -6,6 +7,8 @@ from bokeh.layouts import row
 from bokeh.models import ColumnDataSource, LinearAxis, Range1d
 from bokeh.plotting import figure
 from IPython import display
+
+BOKEH_VERSION = bokeh.__version__
 
 
 class SolverPrinter:
@@ -94,36 +97,67 @@ class SolverPlotter:
         epoch_training_plt_data = ColumnDataSource(
             data=dict(x=list(solver.per_epoch_train_acc_history.keys()),
                       y=list(solver.per_epoch_train_acc_history.values())))
-        epoch_plot.line('x',
-                        'y',
-                        source=epoch_training_plt_data,
-                        line_color='orange',
-                        line_width=2,
-                        legend_label='Training')
-        epoch_plot.circle('x',
-                          'y',
-                          source=epoch_training_plt_data,
-                          line_color='orange',
-                          fill_color='orange',
-                          line_width=2,
-                          legend_label='Training')
+
+        if BOKEH_VERSION == '1.4.0':
+            epoch_plot.line('x',
+                            'y',
+                            source=epoch_training_plt_data,
+                            line_color='orange',
+                            line_width=2,
+                            legend_label='Training')
+            epoch_plot.circle('x',
+                              'y',
+                              source=epoch_training_plt_data,
+                              line_color='orange',
+                              fill_color='orange',
+                              line_width=2,
+                              legend_label='Training')
+        else:
+            epoch_plot.line('x',
+                            'y',
+                            source=epoch_training_plt_data,
+                            line_color='orange',
+                            line_width=2,
+                            legend='Training')
+            epoch_plot.circle('x',
+                              'y',
+                              source=epoch_training_plt_data,
+                              line_color='orange',
+                              fill_color='orange',
+                              line_width=2,
+                              legend='Training')
 
         epoch_validation_plt_data = ColumnDataSource(
             data=dict(x=list(solver.val_acc_history.keys()),
                       y=list(solver.val_acc_history.values())))
-        epoch_plot.circle('x',
-                          'y',
-                          source=epoch_validation_plt_data,
-                          line_color='green',
-                          fill_color='green',
-                          line_width=2,
-                          legend_label='Validation')
-        epoch_plot.line('x',
-                        'y',
-                        source=epoch_validation_plt_data,
-                        line_color='green',
-                        line_width=2,
-                        legend_label='Validation')
+        if BOKEH_VERSION == '1.4.0':
+            epoch_plot.circle('x',
+                              'y',
+                              source=epoch_validation_plt_data,
+                              line_color='green',
+                              fill_color='green',
+                              line_width=2,
+                              legend_label='Validation')
+            epoch_plot.line('x',
+                            'y',
+                            source=epoch_validation_plt_data,
+                            line_color='green',
+                            line_width=2,
+                            legend_label='Validation')
+        else:
+            epoch_plot.circle('x',
+                              'y',
+                              source=epoch_validation_plt_data,
+                              line_color='green',
+                              fill_color='green',
+                              line_width=2,
+                            legend='Validation')
+            epoch_plot.line('x',
+                            'y',
+                            source=epoch_validation_plt_data,
+                            line_color='green',
+                            line_width=2,
+                            legend='Validation')
         epoch_plot.legend.click_policy = 'hide'
 
         epoch_plot.legend.location = 'bottom_right'
