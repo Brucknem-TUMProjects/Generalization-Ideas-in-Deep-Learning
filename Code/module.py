@@ -23,7 +23,7 @@ FOLDER = 'solvers/'
 PARSER.add_argument("--dir",
                     "-d",
                     help="specify the directory (default: %s)" % FOLDER)
-FILENAME = 'latest.pth'
+FILENAME = 'solver.pth'
 PARSER.add_argument("--file",
                     "-f",
                     help="specify the filename (default: %s)" % FILENAME)
@@ -67,7 +67,7 @@ NUM_EPOCHS = 5
 PARSER.add_argument("--num_epochs",
                     help="specify the number of epochs (default: %s)" %
                     NUM_EPOCHS)
-SAVE_EVERY = -1 
+SAVE_EVERY = -1
 PARSER.add_argument(
     "--save_every_epoch",
     help=
@@ -136,7 +136,7 @@ def train():
                  filename=FILENAME)
     print(80 * "*" + "\n")
     print("Saving solver!")
-    solver.save_solver()
+    solver.save_solver(filename=FILENAME, folder=FOLDER)
     print("\n" + 80 * "*" + "\n")
 
 
@@ -149,13 +149,17 @@ BATCH_SIZE = int(
     ARGS.batch_size if ARGS.batch_size is not None else BATCH_SIZE)
 NUM_EPOCHS = int(
     ARGS.num_epochs if ARGS.num_epochs is not None else NUM_EPOCHS)
-LOG_EVERY = int(ARGS.log_every_iteration if ARGS.log_every_iteration is not None else LOG_EVERY)
-SAVE_EVERY = int(ARGS.save_every_epoch if ARGS.save_every_epoch is not None else SAVE_EVERY)
+LOG_EVERY = int(ARGS.log_every_iteration
+                if ARGS.log_every_iteration is not None else LOG_EVERY)
+SAVE_EVERY = int(
+    ARGS.save_every_epoch if ARGS.save_every_epoch is not None else SAVE_EVERY)
 SUBSET_SIZE = int(
     ARGS.subset_size if ARGS.subset_size is not None else SUBSET_SIZE)
 
 FOLDER = ARGS.dir if ARGS.dir is not None else FOLDER
 FILENAME = ARGS.file if ARGS.file is not None else FILENAME
+
+print(SAVE_EVERY)
 
 if not FOLDER.endswith('/'):
     FOLDER += '/'

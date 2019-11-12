@@ -94,7 +94,7 @@ class Solver:
               save_after_epoch=False,
               save_best_solver=True,
               save_every_epoch=-1,
-              filename='latest.pth',
+              filename='solver.pth',
               folder='solvers/'):
         """ Trains the network.
         Iterates over the trainings data num_epochs time and performs gradient descent
@@ -220,10 +220,10 @@ class Solver:
                     self.best_val_acc = val_accuracy
                     self.best_params = self.model.state_dict()
                     self.best_solver = Solver(**(self.to_output_dict(False)))
+                    self.best_solver.best_solver = None
 
                     if save_best_solver:
-                        self.save_best_solver(folder=folder,
-                                              filename=filename + '.best.pth')
+                        self.save_best_solver(folder=folder, filename=filename)
 
                 self.print_and_buffer(len(header) * "-", verbose)
                 self.print_and_buffer(
@@ -239,9 +239,11 @@ class Solver:
 
             if save_after_epoch:
                 self.save_solver(filename=filename, folder=folder)
-            if not total_epoch % save_after_epoch:
-                self.save_solver(filename=filename, folder=folder)
 
+            if total_epoch % save_every_epoch == 0:
+                self.save_solver(filename=filename,
+                                 folder=folder,
+                                 epoch=total_epoch)
 
         # At the end of training swap the best params into the model
         self.model.params = self.best_params
@@ -323,17 +325,15 @@ class Solver:
                     ('Predicted', ' '.join('%8s' % predicted[j].item()
                                            for j in range(real_num_samples))))
 
-    def save_best_solver(self, filename='best.pth', folder='solvers'):
+    def save_best_solver(self, filename='solver_best.pth', folder='solvers'):
         if self.best_solver:
+            filename = remove_pth(filename) + '_best.pth'
             save_solver(self.best_solver, filename, folder)
         else:
             print('No best solver present. Maybe missing a validation loader!')
 
-    def save_solver(self, filename='latest.pth', folder='solvers', epoch=0):
-        if epoch:
-            f = filename if not filename.endswith('pth') else filename[:-len('.pth')]
-            f += '_e' + str(epoch)
-        save_solver(self, filename, folder)
+    def save_solver(self, filename='solver.pth', folder='solvers', epoch=0):
+        save_solver(self, filename, folder, epoch)
 
     def __deepcopy__(self, memo):
         cls = self.__class__
@@ -341,7 +341,10 @@ class Solver:
         memo[id(self)] = result
 
         for k, v in self.__dict__.items():
-            if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_solver' or k is 'best_params' or k is 'trainloader' or k is 'validationloader':
+            if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_params' or k is 'trainloader' or k is 'validationloader':
+                continue
+
+            if k in memo:
                 continue
 
             setattr(result, k, copy.deepcopy(v, memo))
@@ -361,21 +364,27 @@ class Solver:
         return best_solver
 
 
-def save_solver(solver, filename='latest.pth', folder='solvers'):
+def save_solver(solver, filename='solver.pth', folder='solvers', epoch=0):
     output_dict = solver.to_output_dict()
+
+    output_dict['model'].cpu()
 
     folder = folder if folder.endswith('/') else folder + '/'
 
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-    filename = filename if filename.endswith('.pth') else filename + '.pth'
+    if epoch:
+        filename = remove_pth(filename)
+        filename += '_e' + str(epoch)
+
+    filename = add_pth(filename)
     cPickle.dump(dict(output_dict), open(folder + filename, 'wb'), 2)
 
 
 def load_solver(trainloader=None,
                 validationloader=None,
-                filename='latest.pth',
+                filename='solver.pth',
                 folder='solvers'):
     folder = folder if folder.endswith('/') else folder + '/'
     data = cPickle.load(open(folder + filename, 'rb'))
@@ -384,3 +393,13 @@ def load_solver(trainloader=None,
     data['validationloader'] = validationloader
 
     return Solver(**data)
+
+
+def add_pth(s):
+    return s if s.endswith('.pth') else s + '.pth'
+
+
+def remove_pth(s):
+    print(s)
+
+    return s if not s.endswith('.pth') else s[:-len('.pth')]

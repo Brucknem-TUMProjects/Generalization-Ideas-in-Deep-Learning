@@ -29,59 +29,6 @@ class ExampleNet(nn.Module):
     def loss_function(self):
         return "l2"
 
-
-def extract_layer_weights(layer, name="model"):
-    result = {}
-
-    if isinstance(layer, nn.Sequential):
-        for i in range(len(layer)):
-            n = str(i)
-            result.setdefault(n,
-                              {}).update(**extract_layer_weights(layer[i], n))
-    elif isinstance(layer, nn.Module):
-        if not (layer._modules):
-            try:
-                result[name] = layer._parameters['weight'].detach().cpu(
-                ).numpy()
-            except:
-                pass
-                # print(type(layer), " has no weights")
-        else:
-            for k, v in layer._modules.items():
-                n = str(k)
-                result.setdefault(n, {}).update(**extract_layer_weights(v, n))
-
-    return flatten(result)
-
-
-def flatten(d, parent_key='', sep='_'):
-    items = []
-
-    for k, v in d.items():
-        new_key = parent_key + sep + k if parent_key else k
-
-        if isinstance(v, collections.MutableMapping):
-            items.extend(flatten(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-
-    return dict(items)
-
-
-def extract_layer_shapes(model):
-    if isinstance(model, nn.Module):
-        layers = extract_layer_weights(model)
-    else:
-        layers = model
-
-    shapes = {}
-
-    for k, v in layers.items():
-        shapes[k] = v.shape
-
-    return shapes
-
-
 '''
 Taken from https://github.com/chengyangfu/pytorch-vgg-cifar10
 '''
@@ -103,6 +50,7 @@ class VGG(nn.Module):
     '''
     VGG model
     '''
+
     def __init__(self, features):
         super(VGG, self).__init__()
         self.features = features
@@ -153,7 +101,7 @@ def make_layers(cfg, batch_norm=False):
 cfg = {
     'A': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'B':
-    [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
+        [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
     'D': [
         64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M',
         512, 512, 512, 'M'
