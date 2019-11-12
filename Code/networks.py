@@ -30,13 +30,14 @@ class ExampleNet(nn.Module):
         return "l2"
 
 
-def extract_layer_names(layer, name="model"):
+def extract_layer_weights(layer, name="model"):
     result = {}
 
     if isinstance(layer, nn.Sequential):
         for i in range(len(layer)):
             n = str(i)
-            result.setdefault(n, {}).update(**extract_layer_names(layer[i], n))
+            result.setdefault(n,
+                              {}).update(**extract_layer_weights(layer[i], n))
     elif isinstance(layer, nn.Module):
         if not (layer._modules):
             try:
@@ -48,7 +49,7 @@ def extract_layer_names(layer, name="model"):
         else:
             for k, v in layer._modules.items():
                 n = str(k)
-                result.setdefault(n, {}).update(**extract_layer_names(v, n))
+                result.setdefault(n, {}).update(**extract_layer_weights(v, n))
 
     return flatten(result)
 
@@ -65,6 +66,20 @@ def flatten(d, parent_key='', sep='_'):
             items.append((new_key, v))
 
     return dict(items)
+
+
+def extract_layer_shapes(model):
+    if isinstance(model, nn.Module):
+        layers = extract_layer_weights(model)
+    else:
+        layers = model
+
+    shapes = {}
+
+    for k, v in layers.items():
+        shapes[k] = v.shape
+
+    return shapes
 
 
 '''

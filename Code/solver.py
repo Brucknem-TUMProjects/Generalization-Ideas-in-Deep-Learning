@@ -320,7 +320,10 @@ class Solver:
                                            for j in range(real_num_samples))))
 
     def save_best_solver(self, filename='best.pth', folder='solvers'):
-        save_solver(self.best_solver, filename, folder)
+        if self.best_solver:
+            save_solver(self.best_solver, filename, folder)
+        else:
+            print('No best solver present. Maybe missing a validation loader!')
 
     def save_solver(self, filename='latest.pth', folder='solvers'):
         save_solver(self, filename, folder)
