@@ -93,6 +93,7 @@ class Solver:
               plot=False,
               save_after_epoch=False,
               save_best_solver=True,
+              save_every_epoch=-1,
               filename='latest.pth',
               folder='solvers/'):
         """ Trains the network.
@@ -223,8 +224,6 @@ class Solver:
                     if save_best_solver:
                         self.save_best_solver(folder=folder,
                                               filename=filename + '.best.pth')
-                    # for k, v in self.best_params.items():
-                    #   self.best_params[k] = v.cpu()
 
                 self.print_and_buffer(len(header) * "-", verbose)
                 self.print_and_buffer(
@@ -237,7 +236,12 @@ class Solver:
                         total_epoch, val_accuracy)
 
             self.print_and_buffer(verbose=verbose)
-            self.save_solver()
+
+            if save_after_epoch:
+                self.save_solver(filename=filename, folder=folder)
+            if not total_epoch % save_after_epoch:
+                self.save_solver(filename=filename, folder=folder)
+
 
         # At the end of training swap the best params into the model
         self.model.params = self.best_params
@@ -325,7 +329,10 @@ class Solver:
         else:
             print('No best solver present. Maybe missing a validation loader!')
 
-    def save_solver(self, filename='latest.pth', folder='solvers'):
+    def save_solver(self, filename='latest.pth', folder='solvers', epoch=0):
+        if epoch:
+            f = filename if not filename.endswith('pth') else filename[:-len('.pth')]
+            f += '_e' + str(epoch)
         save_solver(self, filename, folder)
 
     def __deepcopy__(self, memo):
@@ -362,6 +369,7 @@ def save_solver(solver, filename='latest.pth', folder='solvers'):
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+    filename = filename if filename.endswith('.pth') else filename + '.pth'
     cPickle.dump(dict(output_dict), open(folder + filename, 'wb'), 2)
 
 

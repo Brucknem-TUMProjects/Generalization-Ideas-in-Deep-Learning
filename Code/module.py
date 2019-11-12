@@ -67,9 +67,15 @@ NUM_EPOCHS = 5
 PARSER.add_argument("--num_epochs",
                     help="specify the number of epochs (default: %s)" %
                     NUM_EPOCHS)
+SAVE_EVERY = -1 
+PARSER.add_argument(
+    "--save_every_epoch",
+    help=
+    "specify after how many epochs the solver save its state to drive (default: %s)"
+    % SAVE_EVERY)
 LOG_EVERY = 50
 PARSER.add_argument(
-    "--log_every",
+    "--log_every_iteration",
     help=
     "specify after how many iterations the solver logs the current loss and accuracy (default: %s)"
     % LOG_EVERY)
@@ -124,6 +130,7 @@ def train():
                  plot=PLOT,
                  verbose=VERBOSE,
                  save_after_epoch=True,
+                 save_every_epoch=SAVE_EVERY,
                  save_best_solver=True,
                  folder=FOLDER,
                  filename=FILENAME)
@@ -142,7 +149,8 @@ BATCH_SIZE = int(
     ARGS.batch_size if ARGS.batch_size is not None else BATCH_SIZE)
 NUM_EPOCHS = int(
     ARGS.num_epochs if ARGS.num_epochs is not None else NUM_EPOCHS)
-LOG_EVERY = int(ARGS.log_every if ARGS.log_every is not None else LOG_EVERY)
+LOG_EVERY = int(ARGS.log_every_iteration if ARGS.log_every_iteration is not None else LOG_EVERY)
+SAVE_EVERY = int(ARGS.save_every_epoch if ARGS.save_every_epoch is not None else SAVE_EVERY)
 SUBSET_SIZE = int(
     ARGS.subset_size if ARGS.subset_size is not None else SUBSET_SIZE)
 
