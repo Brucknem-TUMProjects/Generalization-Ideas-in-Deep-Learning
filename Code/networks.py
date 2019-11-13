@@ -4,6 +4,8 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
+import torchvision
+import torchvision.models as models
 
 
 class ExampleNet(nn.Module):
@@ -28,6 +30,9 @@ class ExampleNet(nn.Module):
 
     def loss_function(self):
         return "l2"
+
+def torch_vgg16():
+    return models.vgg16(pretrained=False)
 
 '''
 Taken from https://github.com/chengyangfu/pytorch-vgg-cifar10

@@ -1,7 +1,6 @@
 # DL stuff
 data/
 cifar*
-*.sbatch
 *.pth
 
 # Byte-compiled / optimized / DLL files

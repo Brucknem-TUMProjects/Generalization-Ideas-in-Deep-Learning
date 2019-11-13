@@ -3,6 +3,7 @@ Nice solver my Marcel Bruckner.
 """
 import copy
 import os
+import shutil
 
 import _pickle as cPickle
 import numpy as np
@@ -277,14 +278,14 @@ class Solver:
         if verbose:
             print(message)
 
-    # def debug_sizes(self):
-    #     print("%31s: %15s" %
-    #           ("Epoch " + str(total_epoch), helpers.get_size(self)))
-    #
-    #     for k, v in self.__dict__.items():
-    #         print("%31s: %15d" % (k, helpers.get_size(v)))
-    #
-    #     print(80 * "*")
+    def debug_sizes(self):
+        print("%31s: %15s" %
+              ("Epoch " + str(total_epoch), helpers.get_size(self)))
+   
+        for k, v in self.__dict__.items():
+            print("%31s: %15d" % (k, helpers.get_size(v)))
+   
+        print(80 * "*")
 
     def predict_samples(self, classes=None, num_samples=8):
         """ Picks some random samples from the validation data and predicts the labels.
@@ -400,6 +401,4 @@ def add_pth(s):
 
 
 def remove_pth(s):
-    print(s)
-
     return s if not s.endswith('.pth') else s[:-len('.pth')]

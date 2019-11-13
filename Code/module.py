@@ -10,6 +10,8 @@ import data_visualization
 import networks
 from solver import *
 
+import shutil
+
 # initiate the parser
 PARSER = argparse.ArgumentParser()
 
@@ -159,7 +161,8 @@ SUBSET_SIZE = int(
 FOLDER = ARGS.dir if ARGS.dir is not None else FOLDER
 FILENAME = ARGS.file if ARGS.file is not None else FILENAME
 
-print(SAVE_EVERY)
+
+shutil.rmtree(FOLDER, ignore_errors=True)
 
 if not FOLDER.endswith('/'):
     FOLDER += '/'
