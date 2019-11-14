@@ -3,11 +3,9 @@ CLI trainer
 """
 # include standard modules
 import argparse
-import os
 import shutil
 
 import data_loader
-import data_visualization
 import networks
 from solver import *
 
@@ -43,9 +41,9 @@ VALIDATION_SET = KNOWN_SETS[0]
 PARSER.add_argument("--validation_set",
                     "-vs",
                     help="specify the validation set (default: %s)" %
-                    VALIDATION_SET)
+                         VALIDATION_SET)
 
-BATCH_SIZE = 64
+BATCH_SIZE = 4
 PARSER.add_argument("--batch_size",
                     "-bs",
                     help="specify the batch size (default: %s)" % BATCH_SIZE)
@@ -54,7 +52,7 @@ PARSER.add_argument(
     "--subset_size",
     "-ss",
     help="specify the subset size, -1 for whole set (default: %s)" %
-    SUBSET_SIZE)
+         SUBSET_SIZE)
 PARSER.add_argument("--random_labels",
                     "-r",
                     help="use randomly generated labels",
@@ -77,13 +75,13 @@ NUM_EPOCHS = 5
 PARSER.add_argument("--num_epochs",
                     "-e",
                     help="specify the number of epochs (default: %s)" %
-                    NUM_EPOCHS)
+                         NUM_EPOCHS)
 SAVE_EVERY = -1
 PARSER.add_argument(
     "--save_every_nth_epoch",
     "-nth",
     help=
-    "specify after how many epochs the solver save its state to drive (default: %s)"
+    "specify after how many epochs the solver saves a checkpoint of its state to drive (default: %s)"
     % SAVE_EVERY)
 LOG_EVERY = 50
 PARSER.add_argument(
@@ -100,10 +98,14 @@ PARSER.add_argument("--save_best",
                     "-sb",
                     help="save the solver whenever it exceeds the best validation accuracy",
                     action="store_true")
+PARSER.add_argument("--save_on_training_100",
+                    "-st100",
+                    help="save the solver when it hits 100% training accuracy",
+                    action="store_true")
+SAVE_LATEST = -1
 PARSER.add_argument("--save_latest",
                     "-sl",
-                    help="save the solver after every epoch",
-                    action="store_true")
+                    help="save the solver state after every nth epoch (default: %s)" % SAVE_LATEST)
 PARSER.add_argument("--debug", help="debug script", action="store_true")
 
 # read arguments from the command line
@@ -111,6 +113,11 @@ ARGS = PARSER.parse_args()
 
 
 def train():
+    """
+    Trains a network
+
+    :return:
+    """
     if ARGS.empty_dir:
         shutil.rmtree(FOLDER, ignore_errors=True)
         ARGS.create_solver = True
@@ -138,10 +145,11 @@ def train():
                      'epochs': NUM_EPOCHS,
                      'log_every': LOG_EVERY,
                      'plot': PLOT,
-                     'verbose': VERBOSE
+                     'verbose': VERBOSE,
+                     'save_on_training_100': ARGS.save_on_training_100
                  },
                  saving={
-                     'latest': True,
+                     'latest': SAVE_LATEST,
                      'nth_epoch': SAVE_EVERY,
                      'best': ARGS.save_best,
                      'folder': FOLDER,
@@ -164,6 +172,8 @@ LOG_EVERY = int(ARGS.log_every_iteration
                 if ARGS.log_every_iteration is not None else LOG_EVERY)
 SAVE_EVERY = int(
     ARGS.save_every_nth_epoch if ARGS.save_every_nth_epoch is not None else SAVE_EVERY)
+SAVE_LATEST = int(
+    ARGS.save_latest if ARGS.save_latest is not None else SAVE_LATEST)
 SUBSET_SIZE = int(
     ARGS.subset_size if ARGS.subset_size is not None else SUBSET_SIZE)
 
@@ -192,12 +202,14 @@ if ARGS.validation_set:
         raise ValueError('Invalid validation set: "%s"' % ARGS.validation_set)
     TRAIN_SET = ARGS.validation_set
 
-print("\n" + 80 * "*" + "\n")
-print("Module is running!")
-print("\n" + 80 * "*" + "\n")
+if ARGS.verbose:
+    print("\n" + 80 * "*" + "\n")
+    print("Module is running!")
+    print("\n" + 80 * "*" + "\n")
 
 if ARGS.train:
     train()
 
-print("Module finished!")
-print("\n" + 80 * "*" + "\n")
+if ARGS.verbose:
+    print("Module finished!")
+    print("\n" + 80 * "*" + "\n")

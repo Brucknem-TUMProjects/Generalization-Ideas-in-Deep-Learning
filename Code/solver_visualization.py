@@ -1,18 +1,24 @@
 import bokeh
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 from bokeh.io import output_notebook, push_notebook, show
 from bokeh.layouts import row
-from bokeh.models import ColumnDataSource, LinearAxis, Range1d
+from bokeh.models import ColumnDataSource
 from bokeh.plotting import figure
-from IPython import display
+
 import helpers
 
 BOKEH_VERSION = bokeh.__version__
 
 
 def debug_sizes(solver, total_epoch=0):
+    """
+    Gets a rough estimate of the solvers size on drive
+
+    :param solver:
+    :param total_epoch:
+    :return:
+    """
     print("%34s: %15s" %
           ("Epoch " + str(total_epoch), helpers.get_size(solver)))
 
@@ -23,8 +29,12 @@ def debug_sizes(solver, total_epoch=0):
 
 
 def print_class_accuracies(solver, classes=None):
-    """ Prints the class accuracies.
-    classes -- list of classnames - (default=None)
+    """
+    Prints the class accuracies.
+
+    :param solver:
+    :param classes:
+    :return:
     """
 
     if not solver.validationloader:
@@ -59,8 +69,49 @@ def print_class_accuracies(solver, classes=None):
               (classes[i], 100 * class_correct[i] / class_total[i]))
 
 
+def print_plots(solver):
+    """
+    Prints the plots for
+        - Training loss
+        - Per iteration Training accuracy
+        - Validation accuracy
+        - Per epoch Training accuracy
+
+    :param solver:
+    :return:
+    """
+
+    plt.subplot(2, 1, 1)
+    plt.title('Training')
+
+    plt.plot(solver.loss_history, 'o', label='loss')
+    plt.plot(solver.per_iteration_train_acc_history, 'o', label='accuracy')
+    plt.xlabel('Iteration')
+    plt.legend(loc='lower right')
+
+    plt.subplot(2, 1, 2)
+    plt.title('Accuracy')
+    plt.plot(solver.per_epoch_train_acc_history, '-o', label='train')
+
+    if solver.validationloader:
+        plt.plot(solver.val_acc_history, '-o', label='val')
+    plt.xlabel('Epoch')
+    plt.legend(loc='lower right')
+    plt.gcf().set_size_inches(15, 12)
+    plt.show()
+
+
 class SolverPlotter:
+    """
+    Class to plot the solver histories
+    """
+
     def __init__(self, solver):
+        """
+        Constructor
+
+        :param solver:
+        """
         output_notebook()
         self.tools = "pan,wheel_zoom,box_zoom,reset,save,crosshair, hover"
 
@@ -150,53 +201,59 @@ class SolverPlotter:
         self.epoch_validation_plt_data = epoch_validation_plt_data
 
     def append_training_loss(self, iteration, value):
+        """
+        Appends a value to the training loss history plot
+
+        :param iteration:
+        :param value:
+        :return:
+        """
         self.loss_plt_data.stream(dict(y=[value], x=[iteration]))
 
         push_notebook(handle=self.training_handle)
 
     def append_training_accuracy(self, iteration, value):
+        """
+        Appends a value to the training accuracy history plot
+
+        :param iteration:
+        :param value:
+        :return:
+        """
         self.accuracy_plt_data.stream(dict(y=[value], x=[iteration]))
 
         push_notebook(handle=self.training_handle)
 
     def append_epoch_training_accuracy(self, epoch, value):
+        """
+        Appends a value to the per epoch training accuracy history plot
+
+        :param epoch:
+        :param value:
+        :return:
+        """
         self.epoch_training_plt_data.stream(dict(y=[value], x=[epoch]))
         push_notebook(handle=self.epoch_handle)
 
     def append_epoch_validation_accuracy(self, epoch, value):
+        """
+        Appends a value to the per epoch validation accuracy history plot
+
+        :param epoch:
+        :param value:
+        :return:
+        """
         self.epoch_validation_plt_data.stream(dict(y=[value], x=[epoch]))
         push_notebook(handle=self.epoch_handle)
 
-    def print_plots(self, solver):
-        """ Prints the plots for
-            - Training loss
-            - Per iteration Training accuracy
-            - Validation accuracy
-            - Per epoch Training accuracy
-        """
-
-        plt.subplot(2, 1, 1)
-        plt.title('Training')
-
-        plt.plot(solver.loss_history, 'o', label='loss')
-        plt.plot(solver.per_iteration_train_acc_history, 'o', label='accuracy')
-        plt.xlabel('Iteration')
-        plt.legend(loc='lower right')
-
-        plt.subplot(2, 1, 2)
-        plt.title('Accuracy')
-        plt.plot(solver.per_epoch_train_acc_history, '-o', label='train')
-
-        if solver.validationloader:
-            plt.plot(solver.val_acc_history, '-o', label='val')
-        # plt.plot([0.5] * len(solver.val_acc_history), 'k--')
-        plt.xlabel('Epoch')
-        plt.legend(loc='lower right')
-        plt.gcf().set_size_inches(15, 12)
-        plt.show()
-
 
 def print_bokeh_plots(solver):
+    """
+    Prints the plots
+
+    :param solver:
+    :return:
+    """
     output_notebook()
 
     self = SolverPlotter(solver)

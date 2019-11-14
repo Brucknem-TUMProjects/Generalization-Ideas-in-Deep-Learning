@@ -224,7 +224,6 @@ class Solver(object):
             acc = np.sqrt(np.square(np.subtract(y, y_pred)).mean())
             return acc
 
-
         for i in range(num_batches):
             start = i * batch_size
             end = (i + 1) * batch_size

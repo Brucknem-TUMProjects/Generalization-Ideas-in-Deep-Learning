@@ -1,13 +1,22 @@
-import os
-import solver as solv
 import _pickle as cPickle
-import helpers
+import os
 
-import solver_visualization
+import helpers
+import solver as solv
 
 APPENDIX = 'a'
 
+
 def save_best_solver(solver, filename='solver_best.pth', folder='solvers', verbose=False):
+    """
+    Saves the best solver
+
+    :param solver:
+    :param filename:
+    :param folder:
+    :param verbose:
+    :return:
+    """
     if solver.best_solver:
         filename = remove_pth(filename) + '_best.pth'
         save_solver(solver.best_solver, filename, folder, verbose)
@@ -16,6 +25,16 @@ def save_best_solver(solver, filename='solver_best.pth', folder='solvers', verbo
 
 
 def save_solver(solver, filename='solver.pth', folder='solvers', epoch='', verbose=False):
+    """
+    Saves the solver
+
+    :param solver:
+    :param filename:
+    :param folder:
+    :param epoch:
+    :param verbose:
+    :return:
+    """
     folder = folder if folder.endswith('/') else folder + '/'
 
     if not os.path.exists(folder):
@@ -37,6 +56,14 @@ def save_solver(solver, filename='solver.pth', folder='solvers', epoch='', verbo
 def load_solver(filename='solver.pth',
                 folder='solvers',
                 verbose=True):
+    """
+    Loads a solver
+
+    :param filename:
+    :param folder:
+    :param verbose:
+    :return:
+    """
     folder = folder if folder.endswith('/') else folder + '/'
 
     if verbose:
@@ -48,8 +75,20 @@ def load_solver(filename='solver.pth',
 
 
 def add_pth(s):
+    """
+    Adds '.pth' to the string if not already present
+
+    :param s:
+    :return:
+    """
     return s if s.endswith('.pth') else s + '.pth'
 
 
 def remove_pth(s):
+    """
+    Removes '.pth' from the string if present
+
+    :param s:
+    :return:
+    """
     return s if not s.endswith('.pth') else s[:-len('.pth')]

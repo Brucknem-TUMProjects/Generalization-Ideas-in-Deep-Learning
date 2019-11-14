@@ -1,15 +1,18 @@
-import collections
 import math
 
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.nn.init as init
-import torchvision
 import torchvision.models as models
 
 
 class ExampleNet(nn.Module):
+    """
+    Small testing network
+    """
     def __init__(self):
+        """
+        Constructor
+        """
         super(ExampleNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -19,6 +22,12 @@ class ExampleNet(nn.Module):
         self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
+        """
+        Forward pass of the net
+
+        :param x:
+        :return:
+        """
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = x.view(-1, 16 * 5 * 5)
@@ -28,14 +37,45 @@ class ExampleNet(nn.Module):
 
         return x
 
-    def loss_function(self):
-        return "l2"
+
+def torch_vgg11():
+    """
+    VGG-11
+
+    :return:
+    """
+    return models.vgg11(pretrained=False)
+
+
+def torch_vgg11_bn():
+    """
+    VGG-11 with Batch Normalization
+
+    :return:
+    """
+    return models.vgg11_bn(pretrained=False)
+
 
 def torch_vgg16():
+    """
+    VGG-16
+
+    :return:
+    """
     return models.vgg16(pretrained=False)
 
+
+def torch_vgg16_bn():
+    """
+    VGG-16 with Batch Normalization
+
+    :return:
+    """
+    return models.vgg16_bn(pretrained=False)
+
+
 '''
-Taken from https://github.com/chengyangfu/pytorch-vgg-cifar10
+Everything below taken from https://github.com/chengyangfu/pytorch-vgg-cifar10
 '''
 
 __all__ = [
