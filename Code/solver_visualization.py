@@ -7,13 +7,19 @@ from bokeh.layouts import row
 from bokeh.models import ColumnDataSource, LinearAxis, Range1d
 from bokeh.plotting import figure
 from IPython import display
+import helpers
 
 BOKEH_VERSION = bokeh.__version__
 
 
-class SolverPrinter:
-    def __init__(self, verbose=False):
-        self.verbose = verbose
+def debug_sizes(solver, total_epoch=0):
+    print("%34s: %15s" %
+          ("Epoch " + str(total_epoch), helpers.get_size(solver)))
+
+    for k, v in solver.__dict__.items():
+        print("%34s: %15d" % (k, helpers.get_size(v)))
+
+    print(80 * "*")
 
 
 def print_class_accuracies(solver, classes=None):
@@ -58,28 +64,29 @@ class SolverPlotter:
         output_notebook()
         self.tools = "pan,wheel_zoom,box_zoom,reset,save,crosshair, hover"
 
-        loss_plt = figure(plot_width=450,
-                          plot_height=400,
-                          tools=self.tools,
-                          title='Training Loss',
-                          x_axis_label='Iteration')
+        upper_row_settings = {
+            'plot_width': 450,
+            'plot_height': 400,
+            'tools': self.tools,
+            'x_axis_label': 'Iteration'
+        }
+
+        loss_plt = figure(**upper_row_settings,
+                          title='Training Loss')
         loss_plt_data = ColumnDataSource(
-            data=dict(x=list(solver.loss_history.keys()),
-                      y=list(solver.loss_history.values())))
+            data=dict(x=list(solver.training_loss_history.keys()),
+                      y=list(solver.training_loss_history.values())))
         loss_plt.line('x',
                       'y',
                       source=loss_plt_data,
                       line_color='red',
                       line_width=1)
 
-        accuracy_plt = figure(plot_width=450,
-                              plot_height=400,
-                              tools=self.tools,
-                              title='Training Accuracy',
-                              x_axis_label='Iteration')
+        accuracy_plt = figure(**upper_row_settings,
+                              title='Training Accuracy')
         accuracy_plt_data = ColumnDataSource(
-            data=dict(x=list(solver.per_iteration_train_acc_history.keys()),
-                      y=list(solver.per_iteration_train_acc_history.values())))
+            data=dict(x=list(solver.training_accuracy_history.keys()),
+                      y=list(solver.training_accuracy_history.values())))
         accuracy_plt.line('x',
                           'y',
                           source=accuracy_plt_data,
@@ -95,72 +102,44 @@ class SolverPlotter:
                             title='Accuracy',
                             x_axis_label='Epoch')
         epoch_training_plt_data = ColumnDataSource(
-            data=dict(x=list(solver.per_epoch_train_acc_history.keys()),
-                      y=list(solver.per_epoch_train_acc_history.values())))
+            data=dict(x=list(solver.epoch_training_accuracy_history.keys()),
+                      y=list(solver.epoch_training_accuracy_history.values())))
 
-        if BOKEH_VERSION == '1.4.0':
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_training_plt_data,
-                            line_color='orange',
-                            line_width=2,
-                            legend_label='Training')
-            epoch_plot.circle('x',
-                              'y',
-                              source=epoch_training_plt_data,
-                              line_color='orange',
-                              fill_color='orange',
-                              line_width=2,
-                              legend_label='Training')
-        else:
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_training_plt_data,
-                            line_color='orange',
-                            line_width=2,
-                            legend='Training')
-            epoch_plot.circle('x',
-                              'y',
-                              source=epoch_training_plt_data,
-                              line_color='orange',
-                              fill_color='orange',
-                              line_width=2,
-                              legend='Training')
+        epoch_training_plt_settings = {
+            'source': epoch_training_plt_data,
+            'line_color': 'orange',
+            'line_width': 2,
+            'legend_label': 'Training'
+        }
+        if BOKEH_VERSION != '1.4.0':
+            epoch_training_plt_settings['legend'] = epoch_training_plt_settings['legend_label']
+            del epoch_training_plt_settings['legend_label']
+
+        epoch_plot.line('x', 'y', **epoch_training_plt_settings)
+        epoch_training_plt_settings['fill_color'] = epoch_training_plt_settings['line_color']
+        epoch_plot.circle('x', 'y', **epoch_training_plt_settings)
 
         epoch_validation_plt_data = ColumnDataSource(
-            data=dict(x=list(solver.val_acc_history.keys()),
-                      y=list(solver.val_acc_history.values())))
-        if BOKEH_VERSION == '1.4.0':
-            epoch_plot.circle('x',
-                              'y',
-                              source=epoch_validation_plt_data,
-                              line_color='green',
-                              fill_color='green',
-                              line_width=2,
-                              legend_label='Validation')
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_validation_plt_data,
-                            line_color='green',
-                            line_width=2,
-                            legend_label='Validation')
-        else:
-            epoch_plot.circle('x',
-                              'y',
-                              source=epoch_validation_plt_data,
-                              line_color='green',
-                              fill_color='green',
-                              line_width=2,
-                            legend='Validation')
-            epoch_plot.line('x',
-                            'y',
-                            source=epoch_validation_plt_data,
-                            line_color='green',
-                            line_width=2,
-                            legend='Validation')
-        epoch_plot.legend.click_policy = 'hide'
+            data=dict(x=list(solver.epoch_validation_accuracy_history.keys()),
+                      y=list(solver.epoch_validation_accuracy_history.values())))
 
+        epoch_validation_plt_settings = {
+            'source': epoch_validation_plt_data,
+            'line_color': 'green',
+            'line_width': 2,
+            'legend_label': 'Validation'
+        }
+        if BOKEH_VERSION != '1.4.0':
+            epoch_validation_plt_settings['legend'] = epoch_validation_plt_settings['legend_label']
+            del epoch_validation_plt_settings['legend_label']
+
+        epoch_plot.line('x', 'y', **epoch_validation_plt_settings)
+        epoch_validation_plt_settings['fill_color'] = epoch_validation_plt_settings['line_color']
+        epoch_plot.circle('x', 'y', **epoch_validation_plt_settings)
+
+        epoch_plot.legend.click_policy = 'hide'
         epoch_plot.legend.location = 'bottom_right'
+
         epoch_handle = show(epoch_plot, notebook_handle=True)
 
         self.training_handle = training_handle

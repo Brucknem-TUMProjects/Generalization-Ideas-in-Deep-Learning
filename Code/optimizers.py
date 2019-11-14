@@ -1,12 +1,6 @@
-import torch
-import torchvision
-import torchvision.models as models
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
-import numpy as np
+
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
+import torch.optim
 
 # Update rules
 
@@ -14,7 +8,7 @@ def sgd(params, optim_params, lr_decay=1.0):
     """ Stocastic gradient descent. """
     lr = optim_params.get('lr', 0.001)
     momentum = optim_params.get('beta', 0.9)
-    return optim.SGD(params, lr=lr, momentum=momentum), lr * lr_decay
+    return torch.optim.SGD(params, lr=lr, momentum=momentum), lr * lr_decay
 
 def adam(params, optim_params, lr_decay=1.0):
     """ Adam solver. """
@@ -24,7 +18,7 @@ def adam(params, optim_params, lr_decay=1.0):
     weight_decay = optim_params.get('weight_decay', 0)
     amsgrad = optim_params.get('amsgrad', False)
 
-    return optim.Adam(params, lr, betas, eps, weight_decay, amsgrad), lr * lr_decay
+    return torch.optim.Adam(params, lr, betas, eps, weight_decay, amsgrad), lr * lr_decay
 
 # Criteria
 

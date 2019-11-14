@@ -20,3 +20,13 @@ def get_size(obj, seen=None):
     elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
         size += sum([get_size(i, seen) for i in obj])
     return size
+
+
+def print_separator():
+    print("\n" + 80 * "*" + "\n")
+
+
+def print_separated(message):
+    # print("\n" + 80 * "*" + "\n")
+    print(message)
+    print("\n" + 80 * "*" + "\n")

@@ -30,7 +30,7 @@ net = ExampleNet()
 # net = models.vgg16(pretrained=False)
 # net = vgg11()
 # testloader=None
-solver = Solver(net, trainloader=trainloader, validationloader=testloader, optim = 'adam')
+solver = Solver(net, trainings_loader=trainloader, validation_loader=testloader, strategy='adam')
 
 solver.train(num_epochs=5, log_every=4, plot=False, verbose=True)
 

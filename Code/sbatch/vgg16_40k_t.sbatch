@@ -8,4 +8,4 @@
 #SBATCH --mail-type=ALL
 #SBATCH --output=/storage/slurm/logs/slurm-%j.out
 #SBATCH --error=/storage/slurm/logs/slurm-%j.out
-srun python3 ../module.py -c -v -vv -t --save_every_epoch 1 --num_epochs 1000 -m torch_vgg16 --subset_size 40000 -d vgg16_40k_t
+srun python3 ../module.py -c -ed -v -vv -t -sl --save_every_nth_epoch 100 --num_epochs 1000 -m torch_vgg16 --subset_size 40000 -d vgg16_40k_t

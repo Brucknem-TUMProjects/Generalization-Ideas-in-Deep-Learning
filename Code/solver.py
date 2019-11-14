@@ -3,9 +3,10 @@ Nice solver my Marcel Bruckner.
 """
 import copy
 import os
-import shutil
 
-import _pickle as cPickle
+
+from typing import Callable
+
 import numpy as np
 import torch
 import torchvision
@@ -13,255 +14,233 @@ from IPython import display
 
 import data_visualization
 import helpers
-import optimizer
+import optimizers
 from solver_visualization import *
+from solver_load_save import *
+
+HEADER = "[epoch, iteration] training loss | training accuracy"
 
 
 class Solver:
     """ This class trains the given NN model. """
+
     def __init__(self,
-                 model,
-                 trainloader=None,
-                 validationloader=None,
-                 optim='adam',
-                 criterion='cross_entropy_loss',
-                 optim_config={},
-                 lr_decay=1.0,
-                 best_val_acc=0,
-                 val_acc_history={},
-                 loss_history={},
-                 per_iteration_train_acc_history={},
-                 per_epoch_train_acc_history={},
-                 log_buffer="",
-                 best_solver=None):
+                 model_type: str = "",
+
+                 model_parameters: dict = None,
+                 best_model_parameters: dict = None,
+                 best_solver: object = None,
+                 best_validation_accuracy: float = 0.0,
+
+                 training_loss_history: dict = None,
+                 training_accuracy_history: dict = None,
+
+                 epoch_training_accuracy_history: dict = None,
+                 epoch_validation_accuracy_history: dict = None,
+
+                 log_buffer: str = ""
+                 ):
         """
         Constructor
+        """
 
-        model               -- the NN model to train (nn.Module)
-        trainloader         -- the trainings data (torch.utils.data.DataLoader)
-        validationloader    -- the validation data (torch.utils.data.DataLoader
-        optimizer           -- the optimization strategy (sgd, adam, ...) - This is the name of one of the functions defined in optimizer.py - (default 'adam')
-        criterion           -- the loss function criterion (l2, cross entropy loss, ...) - This is the name of one of the functions defined in optimizer.py - (default 'cross_entropy_loss')
+        # Set up some variables for book-keeping
+        self.model_type = model_type
+
+        self.model_parameters: dict = model_parameters
+        self.best_model_parameters: dict = best_model_parameters
+        self.best_solver: Solver = best_solver
+        self.best_validation_accuracy: float = best_validation_accuracy or 0.0
+
+        self.training_loss_history: dict = training_loss_history or {}
+        self.training_accuracy_history: dict = training_accuracy_history or {}
+
+        self.epoch_training_accuracy_history: dict = epoch_training_accuracy_history or {0: 0}
+        self.epoch_validation_accuracy_history: dict = epoch_validation_accuracy_history or {0: 0}
+
+        self.log_buffer: str = log_buffer or ""
+
+    def set_model_type(self, model):
+        if self.model_type:
+            if type(model) is not self.model_type:
+                raise ValueError(
+                    'The model type is not equal to the previous used model type. Please use model of type % s'
+                    % self.model_type
+                )
+        self.model_type = type(model)
+
+    def iterate(self, model, trainings_loader, device, optimizer, criterion, epoch, log_every, plotter, verbose):
+        running_loss, running_training_accuracy, epoch_running_training_accuracy = 0.0, 0.0, 0.0
+
+        log_every = len(trainings_loader) - 1 if log_every >= len(trainings_loader) else log_every
+
+        for i, data in enumerate(trainings_loader, 0):
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data[0].to(device), data[1].to(device)
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            # forward + backward + optimize
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            _, predicted_train_labels = torch.max(outputs.data, 1)
+            train_acc = (predicted_train_labels == labels).sum().item() / len(predicted_train_labels)
+
+            # print statistics
+            running_loss += loss.item()
+            running_training_accuracy += train_acc
+            epoch_running_training_accuracy += train_acc
+
+            if i % log_every == (log_every - 1):
+                avg_loss = running_loss / log_every
+                avg_acc = running_training_accuracy / log_every
+
+                total_iteration = (epoch - 1) * len(trainings_loader) + i
+                self.training_loss_history[total_iteration] = avg_loss
+                self.training_accuracy_history[total_iteration] = avg_acc
+
+                if plotter:
+                    plotter.append_training_loss(total_iteration, avg_loss)
+                    plotter.append_training_accuracy(total_iteration, avg_acc)
+
+                running_loss, running_training_accuracy, last_logged = 0.0, 0.0, 0.0
+
+                self.print_and_buffer('[%5d, %9d] %13.8f | %17.8f' % (epoch, i + 1, avg_loss, avg_acc), verbose)
+
+        self.model_parameters = model.state_dict()
+        return epoch_running_training_accuracy / len(trainings_loader)
+
+    def validate(self, model, validation_loader, device, epoch, save_best, folder, filename, plotter, verbose):
+        total_validation_samples, correct_validation_samples = 0, 0
+
+        with torch.no_grad():
+            for data in validation_loader:
+                inputs, labels = data[0].to(device), data[1].to(device)
+                outputs = model(inputs)
+                _, predicted_val_labels = torch.max(outputs.data, 1)
+                total_validation_samples += labels.size(0)
+                correct_validation_samples += (
+                        predicted_val_labels == labels).sum().item()
+
+        val_accuracy = correct_validation_samples / total_validation_samples
+        self.epoch_validation_accuracy_history[epoch] = val_accuracy
+
+        if val_accuracy > self.best_validation_accuracy:
+            self.best_validation_accuracy = val_accuracy
+            self.best_model_parameters = copy.deepcopy(model).cpu().state_dict()
+            # self.best_model_parameters = model.state_dict()
+            self.best_solver = copy.deepcopy(self)
+            self.best_solver.best_solver = None
+
+            if save_best:
+                self.save_best_solver(folder=folder, filename=filename, verbose=False)
+
+        self.print_and_buffer(len(HEADER) * "-", verbose)
+        self.print_and_buffer('[%5d, %9s] %13s   %17.8f' % (epoch, "finished", "accuracy:", val_accuracy), verbose)
+
+        if plotter:
+            plotter.append_epoch_validation_accuracy(epoch, val_accuracy)
+
+    def train(self,
+              model: torch.nn.Module,
+              trainings_loader: torch.utils.data.DataLoader = None,
+              validation_loader: torch.utils.data.DataLoader = None,
+              strategy: dict = None,
+              training: dict = None,
+              saving: dict = None
+              ):
+
+        """ Trains the network.
+        Iterates over the trainings data num_epochs time and performs gradient descent
+        based on the optimizer.
+
+        model               -- the NN model to train (torch.nn.Module)
+        trainings_loader    -- the trainings data (torch.utils.data.DataLoader)
+        validation_loader    -- the validation data (torch.utils.data.DataLoader
+        optimizer           -- the optimization strategy (sgd, adam, ...)
+                                This is the name of one of the functions defined in optimizers.py
+                                (default 'adam')
+        criterion           -- the loss function criterion (l2, cross entropy loss, ...) -
+                                This is the name of one of the functions defined in optimizers.py
+                                (default 'cross_entropy_loss')
         optim_config        -- the configuration of the optimizer
             {
                     lr      -- the learning rate - (default 1.0)
             }
         lr_decay            -- the learning rate decay - (default 1.0)
         num_epochs          -- the number of epochs - (default 10)
-        log_every         -- the number of iterations to pass between every verbose log - (default 100)
+        log_every           -- the number of iterations to pass between every verbose log - (default 100)
         verbose             -- wheather or not to log the trainings progress
-
-        """
-        self.model = model
-        self.trainloader = trainloader
-        self.validationloader = validationloader
-        """ The device used for calculation. CUDA or CPU. """
-        self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
-
-        self.optim = optim
-        self.criterion = criterion
-        self.optim_config = optim_config
-        self.lr_decay = lr_decay
-
-        if not hasattr(optimizer, self.criterion):
-            raise ValueError('Invalid criterion "%s"' % self.criterion)
-        self.criterion_func = getattr(optimizer, self.criterion)
-
-        if not hasattr(optimizer, self.optim):
-            raise ValueError('Invalid optimizer "%s"' % self.optim)
-        self.optim_func = getattr(optimizer, self.optim)
-
-        # Set up some variables for book-keeping
-
-        self.best_val_acc = best_val_acc
-        self.best_params = None
-        self.best_solver = best_solver
-        self.val_acc_history = val_acc_history
-
-        self.loss_history = loss_history
-        self.per_iteration_train_acc_history = per_iteration_train_acc_history
-        self.per_epoch_train_acc_history = per_epoch_train_acc_history
-
-        self.log_buffer = log_buffer
-
-    def train(self,
-              optim_config={},
-              lr_decay=0,
-              num_epochs=10,
-              verbose=True,
-              log_every=100,
-              plot=False,
-              save_after_epoch=False,
-              save_best_solver=True,
-              save_every_epoch=-1,
-              filename='solver.pth',
-              folder='solvers/'):
-        """ Trains the network.
-        Iterates over the trainings data num_epochs time and performs gradient descent
-        based on the optimizer.
         """
 
-        if not self.trainloader:
+        if not trainings_loader:
             raise ValueError(
-                'There is no trainloader specified. Please set one via solver.trainloader = <torch.utils.data.DataLoader>'
+                'There is no trainings loader specified. Please set one via solver.trainings_loader = '
+                '<torch.utils.data.DataLoader> '
             )
 
-        torch.cuda.empty_cache()
+        self.set_model_type(model)
 
-        if not self.val_acc_history:
-            self.val_acc_history[0] = 0
+        optimizer_func, criterion_func, optimizer_config, lr_decay = parse_strategy_settings(strategy or {})
+        epochs, log_every, verbose, plot = parse_training_settings(training or {})
+        save_every_nth_epoch, save_best, save_latest, filename, folder = parse_save_settings(saving or {})
 
-        if not self.per_epoch_train_acc_history:
-            self.per_epoch_train_acc_history[0] = 0
+        device = initialize_model(model, self.model_parameters, verbose)
 
-        if not optim_config:
-            optim_config = self.optim_config
+        previous_epochs = np.max(list(self.epoch_training_accuracy_history.keys()))
 
-        log_every = min(log_every, len(self.trainloader) - 1)
+        plotter = SolverPlotter(self) if plot else None
 
-        if plot:
-            plotter = SolverPlotter(self)
+        if verbose:
+            helpers.print_separated(
+                "Starting training.\n"
+                "Epochs: %s, Logging every %s. iteration, Plotting: %s" % (epochs, log_every, plot)
+            )
 
-        device = self.device
-
-        print("Using device: %s\n" % device)
-
-        header = "[epoch, iteration] training loss | training accuracy"
-
-        self.model.to(device)
-
-        previous_epochs = np.max(list(self.per_epoch_train_acc_history.keys()))
-
-        for epoch in range(num_epochs):  # loop over the dataset multiple times
-
+        for epoch in range(epochs):  # loop over the dataset multiple times
             total_epoch = epoch + previous_epochs + 1
 
-            self.print_and_buffer(header, verbose)
-            self.print_and_buffer(len(header) * "-", verbose)
+            self.print_and_buffer(HEADER, verbose)
+            self.print_and_buffer(len(HEADER) * "-", verbose)
 
-            optimizer, next_lr = self.optim_func(self.model.parameters(),
-                                                 optim_config)
-            optim_config['lr'] = next_lr
-            criterion = self.criterion_func()
+            optimizer, next_lr = optimizer_func(model.parameters(), optimizer_config, lr_decay)
+            optimizer_config['lr'] = next_lr
+            criterion = criterion_func()
 
-            running_loss = 0.0
-            running_training_accuracy = 0.0
-            epoch_running_training_accuracy = 0.0
-
-            for i, data in enumerate(self.trainloader, 0):
-                # get the inputs; data is a list of [inputs, labels]
-                inputs, labels = data[0].to(device), data[1].to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward + backward + optimize
-                outputs = self.model(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-
-                _, predicted_train_labels = torch.max(outputs.data, 1)
-                train_acc = (predicted_train_labels == labels
-                             ).sum().item() / len(predicted_train_labels)
-
-                # print statistics
-                running_loss += loss.item()
-                running_training_accuracy += train_acc
-                epoch_running_training_accuracy += train_acc
-
-                if i % log_every == (log_every - 1):
-                    avg_loss = running_loss / log_every
-                    avg_acc = running_training_accuracy / log_every
-
-                    total_iteration = (total_epoch - 1) * \
-                        len(self.trainloader) + i
-                    self.loss_history[total_iteration] = avg_loss
-                    self.per_iteration_train_acc_history[
-                        total_iteration] = avg_acc
-
-                    if plot:
-                        plotter.append_training_loss(total_iteration, avg_loss)
-                        plotter.append_training_accuracy(
-                            total_iteration, avg_acc)
-
-                    running_loss = 0.0
-                    running_training_accuracy = 0.0
-
-                    self.print_and_buffer(
-                        '[%5d, %9d] %13.8f | %17.8f' %
-                        (total_epoch, i + 1, avg_loss, avg_acc), verbose)
-
-            epoch_train_acc = epoch_running_training_accuracy / \
-                len(self.trainloader)
-            self.per_epoch_train_acc_history[total_epoch] = epoch_train_acc
+            self.epoch_training_accuracy_history[total_epoch] = \
+                self.iterate(model, trainings_loader, device, optimizer, criterion,
+                             total_epoch, log_every, plotter, verbose)
 
             if plot:
-                plotter.append_epoch_training_accuracy(total_epoch,
-                                                       epoch_train_acc)
+                plotter.append_epoch_training_accuracy(total_epoch, self.epoch_training_accuracy_history[-1])
 
-            if self.validationloader:
-                # Validation stuff
-                total_validation_samples = 0
-                correct_validation_samples = 0
-                with torch.no_grad():
-                    for data in self.validationloader:
-                        inputs, labels = data[0].to(device), data[1].to(device)
-                        outputs = self.model(inputs)
-                        _, predicted_val_labels = torch.max(outputs.data, 1)
-                        total_validation_samples += labels.size(0)
-                        correct_validation_samples += (
-                            predicted_val_labels == labels).sum().item()
-
-                val_accuracy = correct_validation_samples / total_validation_samples
-                self.val_acc_history[total_epoch] = val_accuracy
-
-                if val_accuracy > self.best_val_acc:
-                    self.best_val_acc = val_accuracy
-                    self.best_params = self.model.state_dict()
-                    self.best_solver = Solver(**(self.to_output_dict(False)))
-                    self.best_solver.best_solver = None
-
-                    if save_best_solver:
-                        self.save_best_solver(folder=folder, filename=filename)
-
-                self.print_and_buffer(len(header) * "-", verbose)
-                self.print_and_buffer(
-                    '[%5d, %9s] %13s | %17.8f' %
-                    (total_epoch, "finished", "accuracy:", val_accuracy),
-                    verbose)
-
-                if plot:
-                    plotter.append_epoch_validation_accuracy(
-                        total_epoch, val_accuracy)
+            if validation_loader:
+                self.validate(model, validation_loader, device, total_epoch,
+                              save_best, folder, filename, plotter, verbose)
 
             self.print_and_buffer(verbose=verbose)
 
-            if save_after_epoch:
-                self.save_solver(filename=filename, folder=folder)
+            if save_latest:
+                self.save_solver(filename=filename, folder=folder, epoch='a' if total_epoch % 2 == 0 else 'b', verbose=False)
 
-            if total_epoch % save_every_epoch == 0:
+            if total_epoch % save_every_nth_epoch == 0:
                 self.save_solver(filename=filename,
                                  folder=folder,
-                                 epoch=total_epoch)
+                                 epoch=total_epoch,
+                                 verbose=False)
+            # debug_sizes(self, total_epoch)
 
-        # At the end of training swap the best params into the model
-        self.model.params = self.best_params
-        self.model.cpu()
+        model.cpu()
+        del model
         torch.cuda.empty_cache()
 
-    def save_model(self, filename='model.pth'):
-        """ Saves the model parameters.
-        filename -- The file to which the parameters get saved. - default ('model.pth')
-        """
-        torch.save(self.model.state_dict(), filename)
-
-    def load_model(self, filename='model.pth'):
-        """ Loads the model parameters.
-        filename -- The file from which the parameters get loaded. - default ('model.pth')
-        """
-        self.model.load_state_dict(torch.load(filename))
+        if verbose:
+            helpers.print_separator()
+            helpers.print_separated("Training finished.")
 
     def print_class_accuracies(self, classes=None):
         print_class_accuracies(self, classes)
@@ -274,131 +253,103 @@ class Solver:
 
     def print_and_buffer(self, message="", verbose=False):
         self.log_buffer += message + "\n"
-
         if verbose:
             print(message)
 
-    def debug_sizes(self):
-        print("%31s: %15s" %
-              ("Epoch " + str(total_epoch), helpers.get_size(self)))
-   
-        for k, v in self.__dict__.items():
-            print("%31s: %15d" % (k, helpers.get_size(v)))
-   
-        print(80 * "*")
+    def save_best_solver(self, filename='solver_best.pth', folder='solvers', verbose=False):
+        save_best_solver(self, filename=filename, folder=folder, verbose=verbose)
 
-    def predict_samples(self, classes=None, num_samples=8):
-        """ Picks some random samples from the validation data and predicts the labels.
-        classes -- list of classnames - (default=None)
-        """
-        device = self.device
+    def save_solver(self, filename='solver.pth', folder='solvers', epoch='', verbose=False):
+        save_solver(self, filename, folder, epoch, verbose)
 
-        # get some random training images
-        dataiter = iter(self.trainloader)
-        images, labels = dataiter.next()
 
-        real_num_samples = min(num_samples, len(labels))
-        images, labels = images[:real_num_samples].to(
-            device), labels[:real_num_samples].to(device)
+def predict_samples(model, dataloader, classes=None, num_samples=8):
+    """ Picks some random samples from the validation data and predicts the labels.
+    classes -- list of classnames - (default=None)
+    """
 
-        with torch.no_grad():
-            outputs = self.model(images)
-            _, predicted = torch.max(outputs.data, 1)
+    # get some random training images
+    dataiter = iter(dataloader)
+    images, labels = dataiter.next()
 
-            # show images
-            data_visualization.imshow(torchvision.utils.make_grid(
-                images.cpu()))
+    real_num_samples = min(num_samples, len(labels))
 
-            if classes:
-                print('%10s: %s' %
-                      ('Real', ' '.join('%8s' % classes[labels[j]]
-                                        for j in range(real_num_samples))))
-                print(
-                    '%10s: %s' %
-                    ('Predicted', ' '.join('%8s' % classes[predicted[j]]
-                                           for j in range(real_num_samples))))
-            else:
-                print('%10s: %s' %
-                      ('Real', ' '.join('%8s' % labels[j].item()
-                                        for j in range(real_num_samples))))
-                print(
-                    '%10s: %s' %
-                    ('Predicted', ' '.join('%8s' % predicted[j].item()
-                                           for j in range(real_num_samples))))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    images, labels = images[:real_num_samples].to(device), labels[:real_num_samples].to(device)
 
-    def save_best_solver(self, filename='solver_best.pth', folder='solvers'):
-        if self.best_solver:
-            filename = remove_pth(filename) + '_best.pth'
-            save_solver(self.best_solver, filename, folder)
+    with torch.no_grad():
+        outputs = model(images)
+        _, predicted = torch.max(outputs.data, 1)
+
+        # show images
+        data_visualization.imshow(torchvision.utils.make_grid(
+            images.cpu()))
+
+        if classes:
+            print('%10s: %s' %
+                  ('Real', ' '.join('%8s' % classes[labels[j]]
+                                    for j in range(real_num_samples))))
+            print(
+                '%10s: %s' %
+                ('Predicted', ' '.join('%8s' % classes[predicted[j]]
+                                       for j in range(real_num_samples))))
         else:
-            print('No best solver present. Maybe missing a validation loader!')
-
-    def save_solver(self, filename='solver.pth', folder='solvers', epoch=0):
-        save_solver(self, filename, folder, epoch)
-
-    def __deepcopy__(self, memo):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-
-        for k, v in self.__dict__.items():
-            if k is 'device' or k is 'criterion_func' or k is 'optim_func' or k is 'best_params' or k is 'trainloader' or k is 'validationloader':
-                continue
-
-            if k in memo:
-                continue
-
-            setattr(result, k, copy.deepcopy(v, memo))
-
-        return result
-
-    def to_output_dict(self, with_best_solver=True):
-        output_dict = copy.deepcopy(self)
-
-        return dict(output_dict.__dict__)
-
-    def get_best_solver_with_loaders(self):
-        best_solver = self.best_solver
-        best_solver.trainloader = self.trainloader
-        best_solver.validationloader = self.validationloader
-
-        return best_solver
+            print('%10s: %s' %
+                  ('Real', ' '.join('%8s' % labels[j].item()
+                                    for j in range(real_num_samples))))
+            print(
+                '%10s: %s' %
+                ('Predicted', ' '.join('%8s' % predicted[j].item()
+                                       for j in range(real_num_samples))))
 
 
-def save_solver(solver, filename='solver.pth', folder='solvers', epoch=0):
-    output_dict = solver.to_output_dict()
+def parse_strategy_settings(strategy: dict):
+    """
 
-    output_dict['model'].cpu()
+    :type strategy: dict
+    """
+    optimizer_func: Callable = getattr(optimizers, strategy.get('optimizer', 'adam'))
+    criterion_func: Callable = getattr(optimizers, strategy.get('criterion', 'cross_entropy_loss'))
+    optimizer_config: dict = strategy.get('config', {})
+    lr_decay: float = strategy.get('lr_decay', 1.0)
 
-    folder = folder if folder.endswith('/') else folder + '/'
-
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    if epoch:
-        filename = remove_pth(filename)
-        filename += '_e' + str(epoch)
-
-    filename = add_pth(filename)
-    cPickle.dump(dict(output_dict), open(folder + filename, 'wb'), 2)
+    return optimizer_func, criterion_func, optimizer_config, lr_decay
 
 
-def load_solver(trainloader=None,
-                validationloader=None,
-                filename='solver.pth',
-                folder='solvers'):
-    folder = folder if folder.endswith('/') else folder + '/'
-    data = cPickle.load(open(folder + filename, 'rb'))
+def parse_training_settings(training: dict):
+    """
 
-    data['trainloader'] = trainloader
-    data['validationloader'] = validationloader
+    :type training: dict
+    """
+    epochs: int = training.get('epochs', 10)
+    verbose: bool = training.get('verbose', True)
+    log_every: int = training.get('log_every', 50)
+    plot: bool = training.get('plot', False)
 
-    return Solver(**data)
-
-
-def add_pth(s):
-    return s if s.endswith('.pth') else s + '.pth'
+    return epochs, log_every, verbose, plot
 
 
-def remove_pth(s):
-    return s if not s.endswith('.pth') else s[:-len('.pth')]
+def parse_save_settings(saving: dict):
+    """
+
+    :type saving: dict
+    """
+    nth_epoch: int = saving.get('nth_epoch', -1)
+    best: bool = saving.get('best', True)
+    latest: bool = saving.get('latest', True)
+    filename: str = saving.get('filename', 'solver.pth')
+    folder: str = saving.get('folder', 'solvers/')
+    return nth_epoch, best, latest, filename, folder
+
+
+def initialize_model(model, model_parameters=None, verbose=False):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if verbose:
+        helpers.print_separated("Using device: %s" % device)
+
+    if model_parameters:
+        model.load_state_dict(model_parameters)
+
+    torch.cuda.empty_cache()
+    model.cuda(device)
+    return device

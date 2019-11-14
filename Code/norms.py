@@ -12,7 +12,7 @@ def l2_norm_product(layers):
 
     for layer, weights in layers.items():
         if isinstance(weights, torch.Tensor):
-            weights = weights.numpy()
+            weights = weights.cpu().numpy()
 
         layer_result = np.linalg.norm(weights)
 
@@ -34,7 +34,7 @@ def spectral_norm_product(layers):
 
     for layer, weights in layers.items():
         if isinstance(weights, torch.Tensor):
-            weights = weights.numpy()
+            weights = weights.cpu().numpy()
         layer_result = np.matmul(weights, weights.transpose())
         layer_result = np.linalg.eig(layer_result)[0]
         layer_result = layer_result.max()
