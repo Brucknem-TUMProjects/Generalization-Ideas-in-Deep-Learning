@@ -5,6 +5,59 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 
+class SeminarNet(nn.Module):
+    """
+    Light VGG for seminar
+    """
+    def __init__(self):
+        """
+        Constructor
+        """
+        super(SeminarNet, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.Conv2d(256, 512, kernel_size=3, padding=1),
+            # nn.ReLU(inplace=True),
+            # nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            # nn.Linear(2048, 512),
+            nn.Linear(4096, 512),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(512, 256),
+            nn.ReLU(True),
+            nn.Linear(256, 10),
+        )
+
+    def forward(self, x):
+        """
+        Forward pass of the net
+
+        :param x:
+        :return:
+        """
+        x = self.features(x)
+        # print(x.shape)
+        x = x.view(x.size(0), -1)
+        # print(x.shape)
+        x = self.classifier(x)
+
+        return x
+
+
 class ExampleNet(nn.Module):
     """
     Small testing network
@@ -92,9 +145,9 @@ __all__ = [
 
 
 class VGG(nn.Module):
-    '''
+    """
     VGG model
-    '''
+    """
 
     def __init__(self, features):
         super(VGG, self).__init__()

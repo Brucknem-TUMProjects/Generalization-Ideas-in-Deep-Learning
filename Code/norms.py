@@ -50,10 +50,11 @@ def gamma_margin(model: torch.nn.Module, trainings_loader: data_loader, eps: flo
     return all_margins[eps_m]
 
 
-def norm_product(layers: OrderedDict, order: int = None) -> float:
+def norm_product(layers: OrderedDict, order: int = None, with_hidden: bool = False) -> float:
     """
     Calculates the product of norms over layers.
 
+    :param with_hidden:
     :param layers:
     :param order:
     :return:
@@ -67,7 +68,12 @@ def norm_product(layers: OrderedDict, order: int = None) -> float:
         layer_result = 1
         try:
             print("Processing layer %s" % layer)
-            layer_result = np.linalg.norm(weights, ord=order)
+            if layer.endswith('weight'):
+                layer_result = np.linalg.norm(weights, ord=order)
+                if with_hidden:
+                    layer_result *= weights.shape[0]
+            else:
+                print("Skipping %s" % layer)
         except ValueError:
             print("Layer %s has no norm. %s" % (layer, weights.shape))
 
@@ -101,7 +107,7 @@ def spectral_norm(model: torch.nn.Module, trainings_loader: data_loader, eps: fl
     :return:
     """
     margin = gamma_margin(model, trainings_loader, eps)
-    norm = norm_product(model.state_dict(), 2)
+    norm = norm_product(model.state_dict(), order=2, with_hidden=True)
 
     return (margin ** -2) * norm
 

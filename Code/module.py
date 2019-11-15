@@ -33,15 +33,10 @@ PARSER.add_argument("--file",
                     help="specify the filename (default: %s)" % FILENAME)
 
 KNOWN_SETS = ['cifar10']
-TRAIN_SET = KNOWN_SETS[0]
-PARSER.add_argument("--train_set",
+DATA_SET = KNOWN_SETS[0]
+PARSER.add_argument("--data_set",
                     "-ts",
-                    help="specify the training set (default: %s)" % TRAIN_SET)
-VALIDATION_SET = KNOWN_SETS[0]
-PARSER.add_argument("--validation_set",
-                    "-vs",
-                    help="specify the validation set (default: %s)" %
-                         VALIDATION_SET)
+                    help="specify the data set (default: %s)" % DATA_SET)
 
 BATCH_SIZE = 4
 PARSER.add_argument("--batch_size",
@@ -58,10 +53,10 @@ PARSER.add_argument("--random_labels",
                     help="use randomly generated labels",
                     action="store_true")
 
-MODEL = 'ExampleNet'
+MODEL = 'vgg16_bn'
 PARSER.add_argument("--model",
                     "-m",
-                    help="specify the model (default: ExampleNet)")
+                    help="specify the model (default: %s)" % MODEL)
 PARSER.add_argument("--train",
                     "-t",
                     help="train the model",
@@ -123,30 +118,33 @@ def train():
         ARGS.create_solver = True
 
     if ARGS.create_solver:
-        solver = Solver()
+        solver = Solver(
+            model=MODEL,
+            strategy={
+                'optimizer': 'adam',
+                'criterion': 'cross_entropy_loss',
+                'optimizer_config': {},
+                'lr_decay': 0.9
+            },
+            data={
+                'dataset': DATA_SET,
+                'batch_size': BATCH_SIZE,
+                'subset_size': SUBSET_SIZE,
+                'random_labels': RANDOM_LABELS
+            }
+        )
     else:
         solver = load_solver(folder=FOLDER,
                              filename=FILENAME)
 
-    train_loader = getattr(data_loader, TRAIN_SET)(True, BATCH_SIZE,
-                                                   SUBSET_SIZE, RANDOM_LABELS)
-
-    if VALIDATE:
-        validation_loader = getattr(data_loader,
-                                    TRAIN_SET)(False, BATCH_SIZE, SUBSET_SIZE,
-                                               RANDOM_LABELS)
-    else:
-        validation_loader = None
-
-    solver.train(model=MODEL,
-                 trainings_loader=train_loader,
-                 validation_loader=validation_loader,
+    solver.train(
                  training={
                      'epochs': NUM_EPOCHS,
                      'log_every': LOG_EVERY,
                      'plot': PLOT,
                      'verbose': VERBOSE,
-                     'save_on_training_100': ARGS.save_on_training_100
+                     'save_on_training_100': ARGS.save_on_training_100,
+                     'validate': ARGS.validate
                  },
                  saving={
                      'latest': SAVE_LATEST,
@@ -192,15 +190,10 @@ if ARGS.model:
     MODEL = ARGS.model
 MODEL = getattr(networks, MODEL)()
 
-if ARGS.train_set:
-    if not hasattr(data_loader, ARGS.train_set):
-        raise ValueError('Invalid trainset: "%s"' % ARGS.train_set)
-    TRAIN_SET = ARGS.train_set
-
-if ARGS.validation_set:
-    if not hasattr(data_loader, ARGS.validation_set):
-        raise ValueError('Invalid validation set: "%s"' % ARGS.validation_set)
-    TRAIN_SET = ARGS.validation_set
+if ARGS.data_set:
+    if not hasattr(data_loader, ARGS.data_set):
+        raise ValueError('Invalid trainset: "%s"' % ARGS.data_set)
+    DATA_SET = ARGS.data_set
 
 if ARGS.verbose:
     print("\n" + 80 * "*" + "\n")

@@ -2,7 +2,7 @@ import _pickle as cPickle
 import os
 
 import helpers
-import solver as solv
+import solver as _solver
 
 APPENDIX = 'a'
 
@@ -71,7 +71,7 @@ def load_solver(filename='solver.pth',
 
     data = cPickle.load(open(folder + filename, 'rb'))
 
-    return solv.Solver(**data)
+    return _solver.Solver(**data)
 
 
 def add_pth(s):

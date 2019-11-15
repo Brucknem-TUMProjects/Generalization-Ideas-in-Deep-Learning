@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.optim
 
 
-def sgd(params, optim_params, lr_decay=1.0):
+def sgd(params, optim_params, lr_decay=0.9):
     """
     Stochastic gradient descent
 
@@ -17,7 +17,7 @@ def sgd(params, optim_params, lr_decay=1.0):
     return torch.optim.SGD(params, lr=lr, momentum=momentum), lr * lr_decay
 
 
-def adam(params, optim_params, lr_decay=1.0):
+def adam(params, optim_params, lr_decay=0.9):
     """
     Adam
 

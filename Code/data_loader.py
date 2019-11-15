@@ -14,7 +14,7 @@ DEFAULT_TRANSFORM = transforms.Compose([
 ])
 
 
-def cifar10(train, batch_size, subset_size, random_labels):
+def cifar10(train, batch_size, subset_size, random_labels, verbose=True):
     """
     Loads the CIFAR-10 dataset
 
@@ -28,12 +28,14 @@ def cifar10(train, batch_size, subset_size, random_labels):
         return get_CIFAR10_dataloader(train,
                                       batch_size=batch_size,
                                       subset_size=subset_size,
-                                      random_labels=random_labels)
+                                      random_labels=random_labels,
+                                      verbose=verbose)
 
     return get_CIFAR10_dataloader(train,
                                   batch_size=batch_size,
                                   subset_size=subset_size,
-                                  random_labels=random_labels)
+                                  random_labels=random_labels,
+                                  verbose=verbose)
 
 
 def load_CIFAR10_dataset(train,
