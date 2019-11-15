@@ -1,3 +1,5 @@
+import math
+
 import bokeh
 import matplotlib.pyplot as plt
 import torch
@@ -124,20 +126,39 @@ class SolverPlotter:
 
         loss_plt = figure(**upper_row_settings,
                           title='Training Loss')
+
+        iterations_per_epoch = math.ceil(solver.data['subset_size'] / solver.data['batch_size'])
+
+        flattened_training_x_labels = []
+        loss_history = []
+        for epoch, iterations in solver.training_loss_history.items():
+            start_iteration = epoch * iterations_per_epoch
+            loss_history.extend(iterations.values())
+            for iteration in iterations.keys():
+                flattened_training_x_labels += [start_iteration + iteration]
+
         loss_plt_data = ColumnDataSource(
-            data=dict(x=list(solver.training_loss_history.keys()),
-                      y=list(solver.training_loss_history.values())))
+            data=dict(x=flattened_training_x_labels,
+                      y=loss_history))
         loss_plt.line('x',
                       'y',
                       source=loss_plt_data,
                       line_color='red',
                       line_width=1)
 
+        flattened_training_x_labels = []
+        accuracy_history = []
+        for epoch, iterations in solver.training_accuracy_history.items():
+            start_iteration = epoch * iterations_per_epoch
+            accuracy_history.extend(iterations.values())
+            for iteration in iterations.keys():
+                flattened_training_x_labels += [start_iteration + iteration]
+
         accuracy_plt = figure(**upper_row_settings,
                               title='Training Accuracy')
         accuracy_plt_data = ColumnDataSource(
-            data=dict(x=list(solver.training_accuracy_history.keys()),
-                      y=list(solver.training_accuracy_history.values())))
+            data=dict(x=flattened_training_x_labels,
+                      y=accuracy_history))
         accuracy_plt.line('x',
                           'y',
                           source=accuracy_plt_data,

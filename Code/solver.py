@@ -63,11 +63,11 @@ class Solver:
         self.best_solver: Optional[object] = best_solver
         self.best_validation_accuracy: float = best_validation_accuracy or 0.0
 
-        self.training_loss_history: dict = training_loss_history or {0: 0}
-        self.training_accuracy_history: dict = training_accuracy_history or {0: 0}
+        self.training_loss_history: dict = training_loss_history or {}
+        self.training_accuracy_history: dict = training_accuracy_history or {}
 
-        self.epoch_training_accuracy_history: dict = epoch_training_accuracy_history or {0: 0}
-        self.epoch_validation_accuracy_history: dict = epoch_validation_accuracy_history or {0: 0}
+        self.epoch_training_accuracy_history: dict = epoch_training_accuracy_history or {}
+        self.epoch_validation_accuracy_history: dict = epoch_validation_accuracy_history or {}
 
     def iterate(self, model: torch.nn.Module, trainings_loader: torch.utils.data.DataLoader,
                 device: str, optimizer: Callable, criterion: Callable, total_epoch: int,
@@ -89,7 +89,7 @@ class Solver:
         """
         running_loss, running_training_accuracy, epoch_running_training_accuracy = 0.0, 0.0, 0.0
 
-        log_every = len(trainings_loader) if log_every >= len(trainings_loader) else log_every
+        log_every = len(trainings_loader) - 1 if log_every >= len(trainings_loader) else log_every
 
         model.train()
 
@@ -114,21 +114,20 @@ class Solver:
             running_training_accuracy += train_acc
             epoch_running_training_accuracy += train_acc
 
-            if i % log_every == (log_every - 1):
+            if i and i % log_every == 0:
                 avg_loss = running_loss / log_every
                 avg_acc = running_training_accuracy / log_every
 
-                total_iteration = total_epoch * len(trainings_loader) + i + 1
-                self.training_loss_history[total_iteration] = avg_loss
-                self.training_accuracy_history[total_iteration] = avg_acc
+                self.training_loss_history.setdefault(total_epoch, {})[i] = avg_loss
+                self.training_accuracy_history.setdefault(total_epoch, {})[i] = avg_acc
 
                 if plotter:
-                    plotter.append_training_loss(total_iteration, avg_loss)
-                    plotter.append_training_accuracy(total_iteration, avg_acc)
+                    plotter.append_training_loss(total_epoch, i, avg_loss)
+                    plotter.append_training_accuracy(total_epoch, i, avg_acc)
 
                 running_loss, running_training_accuracy = 0.0, 0.0
 
-                print_if_verbose(ITERATION_FORMAT % (total_epoch, i + 1, avg_loss, avg_acc), verbose)
+                print_if_verbose(ITERATION_FORMAT % (total_epoch, i, avg_loss, avg_acc), verbose)
 
         epoch_training_accuracy = epoch_running_training_accuracy / len(trainings_loader)
 
@@ -196,8 +195,8 @@ class Solver:
         :return:
         """
 
-        optimizer, criterion, optimizer_config, lr_decay = parse_strategy_settings(self.strategy or {})
-        dataset, batch_size, subset_size, random_labels = parse_data_settings(self.data or {})
+        optimizer, criterion, optimizer_config, lr_decay = self.parse_strategy_settings(self.strategy or {})
+        dataset, batch_size, subset_size, random_labels = self.parse_data_settings(self.data or {})
 
         epochs, log_every, validate, verbose, plot, save_on_training_100 = parse_training_settings(training or {})
         save_every_nth_epoch, save_best, save_latest, filename, folder = parse_save_settings(saving or {})
@@ -217,7 +216,7 @@ class Solver:
         if validate:
             validation_loader = data_loader_func(False, batch_size, subset_size, random_labels)
 
-        previous_epochs = np.max(list(self.epoch_training_accuracy_history.keys()))
+        previous_epochs = np.max(list(self.epoch_training_accuracy_history.keys()) or [0])
 
         plotter = SolverPlotter(self) if plot else None
 
@@ -226,14 +225,13 @@ class Solver:
             helpers.print_separated("Epochs: %s, Logging every %s. iteration, Plotting: %s" %
                                     (epochs, log_every, plot))
 
-        for epoch in range(epochs):  # loop over the dataset multiple times
-            total_epoch = epoch + previous_epochs + 1
+        epoch = 0
+        while epochs == -1 or epoch < epochs:
+            total_epoch = epoch + previous_epochs
 
             print_if_verbose(HEADER, verbose)
 
-            optimizer, next_lr = optimizer_func(model.parameters(), optimizer_config, lr_decay)
-            optimizer_config['lr'] = next_lr
-            self.strategy['optimizer_config'] = optimizer_config
+            optimizer, self.data['optimizer_config'] = optimizer_func(model.parameters(), optimizer_config, lr_decay)
             criterion = criterion_func()
 
             self.epoch_training_accuracy_history[total_epoch] = \
@@ -263,6 +261,8 @@ class Solver:
                 self.save_solver(filename=filename, folder=folder, epoch='_reached_100', verbose=verbose)
                 break
 
+            epoch += 1
+
         if save_latest:
             self.save_solver(filename=filename, folder=folder, verbose=False)
 
@@ -289,20 +289,18 @@ class Solver:
 
         print("Currently broken!")
 
-        # for epoch in self.epoch_training_accuracy_history.keys():
-        #     if epoch == 0:
-        #         continue
-        #     print(HEADER)
-        #
-        #     for iteration in self.training_loss_history.keys():
-        #         if iteration == 0:
-        #             continue
-        #         print(ITERATION_FORMAT % (epoch, iteration, self.training_loss_history[iteration], self.training_accuracy_history[iteration]))
-        #
-        #     if epoch in self.epoch_validation_accuracy_history.keys():
-        #         print(VALIDATION_FORMAT % (epoch, self.epoch_validation_accuracy_history[epoch]))
-        #
-        #         print()
+        for epoch, epoch_training_accuracy in self.epoch_training_accuracy_history.items():
+            print(HEADER)
+
+            for iteration, value in self.training_loss_history[epoch].items():
+                print(ITERATION_FORMAT %
+                      (epoch, iteration, value, self.training_loss_history[epoch][iteration])
+                      )
+
+            if epoch in self.epoch_validation_accuracy_history.items():
+                print(VALIDATION_FORMAT % (epoch, self.epoch_validation_accuracy_history[epoch]))
+
+            print()
 
     def print_bokeh_plots(self):
         """
@@ -332,6 +330,42 @@ class Solver:
         :return:
         """
         save_solver(self, filename, folder, epoch, verbose)
+
+    def parse_data_settings(self, data: dict):
+        """
+        Parse the data settings dict
+
+        :param data
+        """
+        dataset: str = data.get('dataset', 'cifar10')
+        batch_size: int = data.get('batch_size', 16)
+        subset_size: int = data.get('subset_size', -1)
+        random_labels: bool = data.get('random_labels', False)
+
+        self.data['dataset'] = dataset
+        self.data['batch_size'] = batch_size
+        self.data['subset_size'] = subset_size
+        self.data['random_labels'] = random_labels
+
+        return dataset, batch_size, subset_size, random_labels
+
+    def parse_strategy_settings(self, strategy: dict):
+        """
+        Parse the strategy settings dict
+
+        :param strategy
+        """
+        optimizer: str = strategy.get('optimizer', 'adam')
+        criterion: str = strategy.get('criterion', 'cross_entropy_loss')
+        optimizer_config: dict = strategy.get('config', {})
+        lr_decay: float = strategy.get('lr_decay', 0.9)
+
+        self.strategy['optimizer'] = optimizer
+        self.strategy['criterion'] = criterion
+        self.strategy['optimizer_config'] = optimizer_config
+        self.strategy['lr_decay'] = lr_decay
+
+        return optimizer, criterion, optimizer_config, lr_decay
 
 
 def predict_samples(model, dataloader, classes=None, num_samples=8):
@@ -378,34 +412,6 @@ def predict_samples(model, dataloader, classes=None, num_samples=8):
                 '%10s: %s' %
                 ('Predicted', ' '.join('%8s' % predicted[j].item()
                                        for j in range(real_num_samples))))
-
-
-def parse_data_settings(data: dict):
-    """
-    Parse the data settings dict
-
-    :param data
-    """
-    dataset: str = data.get('dataset', 'cifar10')
-    batch_size: int = data.get('batch_size', 16)
-    subset_size: int = data.get('subset_size', -1)
-    random_labels: bool = data.get('random_labels', False)
-
-    return dataset, batch_size, subset_size, random_labels
-
-
-def parse_strategy_settings(strategy: dict):
-    """
-    Parse the strategy settings dict
-
-    :param strategy
-    """
-    optimizer: str = strategy.get('optimizer', 'adam')
-    criterion: str = strategy.get('criterion', 'cross_entropy_loss')
-    optimizer_config: dict = strategy.get('config', {})
-    lr_decay: float = strategy.get('lr_decay', 0.9)
-
-    return optimizer, criterion, optimizer_config, lr_decay
 
 
 def parse_training_settings(training: dict):

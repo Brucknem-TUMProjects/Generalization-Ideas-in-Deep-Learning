@@ -66,7 +66,7 @@ PARSER.add_argument("--validate",
                     help="validate accuracy after each epoch",
                     action="store_true")
 
-NUM_EPOCHS = 5
+NUM_EPOCHS = -1
 PARSER.add_argument("--num_epochs",
                     "-e",
                     help="specify the number of epochs (default: %s)" %
