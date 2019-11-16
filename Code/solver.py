@@ -274,7 +274,7 @@ class Solver:
         torch.cuda.empty_cache()
         if self.model_state:
             self.model.load_state_dict(self.model_state)
-        self.model.cuda(device)
+        self.model.to(device)
         return device
 
     def print_class_accuracies(self, classes: List[str] = None):
