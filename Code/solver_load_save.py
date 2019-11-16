@@ -35,6 +35,7 @@ def save_solver(solver, filename='solver.pth', folder='solvers', epoch='', verbo
     :param verbose:
     :return:
     """
+    solver.model.train()
     folder = folder if folder.endswith('/') else folder + '/'
 
     if not os.path.exists(folder):

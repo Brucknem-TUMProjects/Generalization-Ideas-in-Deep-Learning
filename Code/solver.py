@@ -2,6 +2,7 @@
 Nice solver my Marcel Bruckner.
 """
 import copy
+from collections import OrderedDict
 from typing import Callable, Optional, List
 
 import numpy as np
@@ -16,8 +17,8 @@ from solver_visualization import *
 
 HEADER = "[epoch, iteration] training loss | training accuracy"
 ITERATION_FORMAT = '[%5d, %9d] %13.8f | %17.8f'
-EPOCH_TRAINING_FORMAT   = len(HEADER) * "-" + "\n" + \
-                          '[%5d]         training accuracy: %17.8f'
+EPOCH_TRAINING_FORMAT = len(HEADER) * "-" + "\n" + \
+                        '[%5d]         training accuracy: %17.8f'
 EPOCH_VALIDATION_FORMAT = '[%5d]       validation accuracy: %17.8f'
 HEADER += "\n" + len(HEADER) * "-"
 
@@ -27,6 +28,8 @@ class Solver:
 
     def __init__(self,
                  model: torch.nn.Module,
+                 model_state: OrderedDict = None,
+
                  strategy: dict = None,
                  data: dict = None,
 
@@ -43,8 +46,6 @@ class Solver:
         """
         Constructor
 
-        :param model_type:
-        :param model_parameters:
         :param best_model_parameters:
         :param best_solver:
         :param best_validation_accuracy:
@@ -52,14 +53,14 @@ class Solver:
         :param training_accuracy_history:
         :param epoch_training_accuracy_history:
         :param epoch_validation_accuracy_history:
-        :param log_buffer:
         """
 
-        self.data = data
-        self.strategy = strategy
+        self.data: dict = data
+        self.strategy: dict = strategy
 
         # Set up some variables for book-keeping
         self.model: torch.nn.Module = model
+        self.model_state: OrderedDict = model_state
 
         self.best_model_parameters: dict = best_model_parameters
         self.best_solver: Optional[object] = best_solver
@@ -71,15 +72,17 @@ class Solver:
         self.epoch_training_accuracy_history: dict = epoch_training_accuracy_history or {}
         self.epoch_validation_accuracy_history: dict = epoch_validation_accuracy_history or {}
 
-    def iterate(self, model: torch.nn.Module, trainings_loader: torch.utils.data.DataLoader,
-                device: str, optimizer: Callable, criterion: Callable, total_epoch: int,
+        self.parse_strategy_settings()
+        self.parse_data_settings()
+
+    def iterate(self, trainings_loader: torch.utils.data.DataLoader,
+                device: torch.device, optimizer: torch.optim, criterion: Callable, total_epoch: int,
                 log_every: int, plotter: solver_visualization.SolverPlotter, verbose: bool):
         """
         Iterates over all samples in the trainings loader and performs gradient descent based on
         the optimization strategy and the loss criterion
 
         :param total_epoch:
-        :param model:
         :param trainings_loader:
         :param device:
         :param optimizer:
@@ -93,7 +96,7 @@ class Solver:
 
         log_every = len(trainings_loader) - 1 if log_every >= len(trainings_loader) else log_every
 
-        model.train()
+        self.model.train()
 
         index_correction = 1
         for i, data in enumerate(trainings_loader, 0):
@@ -104,7 +107,7 @@ class Solver:
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = model(inputs)
+            outputs = self.model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -131,17 +134,19 @@ class Solver:
 
                 print_if_verbose(ITERATION_FORMAT % (total_epoch, i, avg_loss, avg_acc), verbose)
 
-        epoch_training_accuracy = _validate(model, trainings_loader, device)
+        self.model_state = self.model.state_dict()
+        self.strategy['state'] = optimizer.state_dict()
+
+        epoch_training_accuracy = _validate(self.model, trainings_loader, device)
         print_if_verbose(EPOCH_TRAINING_FORMAT % (total_epoch, epoch_training_accuracy), verbose)
 
         return epoch_training_accuracy
 
-    def validate(self, model: torch.nn.Module, validation_loader: torch.utils.data.DataLoader,
-                 device: str, epoch: int, plotter: solver_visualization.SolverPlotter, verbose: bool):
+    def validate(self, validation_loader: torch.utils.data.DataLoader,
+                 device: torch.device, epoch: int, plotter: solver_visualization.SolverPlotter, verbose: bool):
         """
         Validates the model using the data provided by the validation loader
 
-        :param model:
         :param validation_loader:
         :param device:
         :param epoch:
@@ -149,13 +154,13 @@ class Solver:
         :param verbose:
         :return:
         """
-        val_accuracy = _validate(model, validation_loader, device)
+        val_accuracy = _validate(self.model, validation_loader, device)
         self.epoch_validation_accuracy_history[epoch] = val_accuracy
 
         new_best = False
         if val_accuracy > self.best_validation_accuracy:
             self.best_validation_accuracy = val_accuracy
-            self.best_model_parameters = copy.deepcopy(model).cpu().state_dict()
+            self.best_model_parameters = copy.deepcopy(self.model).cpu().state_dict()
             self.best_solver = copy.deepcopy(self)
             self.best_solver.best_solver = None
             new_best = True
@@ -172,17 +177,10 @@ class Solver:
         """
         Trains the network
 
-        :param model:
-        :param trainings_loader:
-        :param validation_loader:
-        :param strategy:
         :param training:
         :param saving:
         :return:
         """
-
-        optimizer, criterion, optimizer_config, lr_decay = self.parse_strategy_settings(self.strategy or {})
-        dataset, batch_size, subset_size, random_labels = self.parse_data_settings(self.data or {})
 
         epochs, log_every, validate, verbose, plot, save_on_training_100 = parse_training_settings(training or {})
         save_every_nth_epoch, save_best, save_latest, filename, folder = parse_save_settings(saving or {})
@@ -190,24 +188,26 @@ class Solver:
         if verbose:
             self.print_log()
 
-        optimizer_func = getattr(optimizers, optimizer)
-        criterion_func = getattr(optimizers, criterion)
+        device = self.initialize_model(verbose)
 
-        model = self.model
-        device = initialize_model(model, verbose)
+        optimizer, self.strategy['config'] = getattr(optimizers, self.strategy['optimizer'])(
+            self.model.parameters(), self.strategy['config'], self.strategy['state'])
+        criterion = getattr(optimizers, self.strategy['criterion'])()
 
-        data_loader_func = getattr(data_loader, dataset)
-        trainings_loader = data_loader_func(True, batch_size, subset_size, random_labels)
+        data_loader_func = getattr(data_loader, self.data['dataset'])
+        trainings_loader = data_loader_func(
+            True, self.data['batch_size'], self.data['subset_size'], self.data['random_labels'])
         validation_loader = None
         if validate:
-            validation_loader = data_loader_func(False, batch_size, subset_size, random_labels)
+            validation_loader = data_loader_func(
+                False, self.data['batch_size'], self.data['subset_size'], self.data['random_labels'])
 
-        previous_epochs = np.max(list(self.epoch_training_accuracy_history.keys()) or [0])
+        previous_epochs = np.max(list(self.epoch_training_accuracy_history.keys()) or [-1]) + 1
 
         plotter = SolverPlotter(self) if plot else None
 
         if verbose:
-            helpers.print_separated("Starting training on model: %s" % model)
+            helpers.print_separated("Starting training on model: %s" % self.model)
             helpers.print_separated("Epochs: %s, Logging every %s. iteration, Plotting: %s" %
                                     (epochs, log_every, plot))
 
@@ -215,21 +215,19 @@ class Solver:
         while epochs == -1 or epoch < epochs:
             total_epoch = epoch + previous_epochs
 
+            adjust_learning_rate(optimizer, total_epoch, self.strategy['config']['lr'])
+
             print_if_verbose(HEADER, verbose)
 
-            optimizer, self.data['optimizer_config'] = optimizer_func(model.parameters(), optimizer_config, lr_decay)
-            criterion = criterion_func()
-
             self.epoch_training_accuracy_history[total_epoch] = \
-                self.iterate(model, trainings_loader, device, optimizer, criterion,
+                self.iterate(trainings_loader, device, optimizer, criterion,
                              total_epoch, log_every, plotter, verbose)
 
             if plot:
                 plotter.append_epoch_training_accuracy(total_epoch, self.epoch_training_accuracy_history[total_epoch])
 
             if validation_loader:
-                new_best = self.validate(model, validation_loader, device, total_epoch,
-                                         save_best, folder, filename, plotter, verbose)
+                new_best = self.validate(validation_loader, device, total_epoch, verbose)
 
                 if save_best and new_best:
                     self.save_best_solver(folder=folder, filename=filename, verbose=False)
@@ -247,7 +245,7 @@ class Solver:
             # debug_sizes(self, total_epoch)
 
             if save_on_training_100 and (1 - self.epoch_training_accuracy_history[total_epoch]) < 1e-8:
-                self.save_solver(filename=filename, folder=folder, epoch='_reached_100', verbose=verbose)
+                self.save_solver(filename=filename, folder=folder, epoch='_reached_100', verbose=False)
                 break
 
             epoch += 1
@@ -255,13 +253,29 @@ class Solver:
         if save_latest:
             self.save_solver(filename=filename, folder=folder, verbose=False)
 
-        model.cpu()
-        del model
         torch.cuda.empty_cache()
 
         if verbose:
             helpers.print_separator()
             helpers.print_separated("Training finished.")
+
+    def initialize_model(self, verbose: bool = False) -> torch.device:
+        """
+        Moves the model to GPU if possible. If given sets the model parameters
+
+        :param model:
+        :param verbose:
+        :return:
+        """
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        if verbose:
+            helpers.print_separated("Using device: %s" % device)
+
+        torch.cuda.empty_cache()
+        if self.model_state:
+            self.model.load_state_dict(self.model_state)
+        self.model.cuda(device)
+        return device
 
     def print_class_accuracies(self, classes: List[str] = None):
         """
@@ -319,41 +333,37 @@ class Solver:
         """
         save_solver(self, filename, folder, epoch, verbose)
 
-    def parse_data_settings(self, data: dict):
+    def parse_data_settings(self):
         """
         Parse the data settings dict
 
         :param data
         """
-        dataset: str = data.get('dataset', 'cifar10')
-        batch_size: int = data.get('batch_size', 16)
-        subset_size: int = data.get('subset_size', -1)
-        random_labels: bool = data.get('random_labels', False)
+        data = self.data or {}
 
-        self.data['dataset'] = dataset
-        self.data['batch_size'] = batch_size
-        self.data['subset_size'] = subset_size
-        self.data['random_labels'] = random_labels
+        self.data['dataset'] = data.get('dataset', 'cifar10')
+        self.data['batch_size'] = data.get('batch_size', 16)
+        self.data['subset_size'] = data.get('subset_size', -1)
+        self.data['random_labels'] = data.get('random_labels', False)
 
-        return dataset, batch_size, subset_size, random_labels
-
-    def parse_strategy_settings(self, strategy: dict):
+    def parse_strategy_settings(self):
         """
         Parse the strategy settings dict
-
-        :param strategy
         """
-        optimizer: str = strategy.get('optimizer', 'adam')
-        criterion: str = strategy.get('criterion', 'cross_entropy_loss')
-        optimizer_config: dict = strategy.get('config', {})
-        lr_decay: float = strategy.get('lr_decay', 0.9)
+        strategy = self.strategy or {}
 
-        self.strategy['optimizer'] = optimizer
-        self.strategy['criterion'] = criterion
-        self.strategy['optimizer_config'] = optimizer_config
-        self.strategy['lr_decay'] = lr_decay
+        self.strategy['optimizer'] = strategy.get('optimizer', 'adam')
+        self.strategy['state'] = strategy.get('state', {})
+        self.strategy['criterion'] = strategy.get('criterion', 'cross_entropy_loss')
+        self.strategy['config'] = strategy.get('config', {})
+        self.strategy['lr_decay'] = strategy.get('lr_decay', 0.9)
 
-        return optimizer, criterion, optimizer_config, lr_decay
+
+def adjust_learning_rate(optimizer, epoch, lr0):
+    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
+    lr = lr0 * (0.9 ** (epoch // 10))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
 
 def predict_samples(model, dataloader, classes=None, num_samples=8):
@@ -402,7 +412,7 @@ def predict_samples(model, dataloader, classes=None, num_samples=8):
                                        for j in range(real_num_samples))))
 
 
-def _validate(model: torch.nn.Module, validation_loader: torch.utils.data.DataLoader, device: str = "cpu"):
+def _validate(model: torch.nn.Module, validation_loader: torch.utils.data.DataLoader, device: torch.device):
     """
     Calculates the correct to total classified ratio of data points in the loader
 
@@ -456,24 +466,7 @@ def parse_save_settings(saving: dict):
     return nth_epoch, best, latest, filename, folder
 
 
-def initialize_model(model, verbose=False):
-    """
-    Moves the model to GPU if possible. If given sets the model parameters
-
-    :param model:
-    :param verbose:
-    :return:
-    """
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if verbose:
-        helpers.print_separated("Using device: %s" % device)
-
-    torch.cuda.empty_cache()
-    model.cuda(device)
-    return device
-
-
-def print_if_verbose(message="", verbose=False):
+def print_if_verbose(message: str = "", verbose: bool = False):
     """
     Appends the message to the log buffer. If verbose, then the message is also printed.
 
