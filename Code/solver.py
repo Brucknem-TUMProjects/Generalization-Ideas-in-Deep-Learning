@@ -16,7 +16,9 @@ from solver_visualization import *
 
 HEADER = "[epoch, iteration] training loss | training accuracy"
 ITERATION_FORMAT = '[%5d, %9d] %13.8f | %17.8f'
-VALIDATION_FORMAT = len(HEADER) * "-" + "\n" + '[%5d, finished ] accuracy:       %17.8f'
+EPOCH_TRAINING_FORMAT   = len(HEADER) * "-" + "\n" + \
+                          '[%5d]         training accuracy: %17.8f'
+EPOCH_VALIDATION_FORMAT = '[%5d]       validation accuracy: %17.8f'
 HEADER += "\n" + len(HEADER) * "-"
 
 
@@ -93,6 +95,7 @@ class Solver:
 
         model.train()
 
+        index_correction = 1
         for i, data in enumerate(trainings_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data[0].to(device), data[1].to(device)
@@ -112,30 +115,29 @@ class Solver:
             # print statistics
             running_loss += loss.item()
             running_training_accuracy += train_acc
-            epoch_running_training_accuracy += train_acc
 
             if i and i % log_every == 0:
-                avg_loss = running_loss / log_every
-                avg_acc = running_training_accuracy / log_every
+                avg_loss = running_loss / (log_every - index_correction)
+                avg_acc = running_training_accuracy / (log_every - index_correction)
 
                 self.training_loss_history.setdefault(total_epoch, {})[i] = avg_loss
                 self.training_accuracy_history.setdefault(total_epoch, {})[i] = avg_acc
 
                 if plotter:
-                    plotter.append_training_loss(total_epoch, i, avg_loss)
-                    plotter.append_training_accuracy(total_epoch, i, avg_acc)
+                    plotter.append_training_loss(total_epoch * len(trainings_loader) + i, avg_loss)
+                    plotter.append_training_accuracy(total_epoch * len(trainings_loader) + i, avg_acc)
 
-                running_loss, running_training_accuracy = 0.0, 0.0
+                running_loss, running_training_accuracy, index_correction = 0.0, 0.0, 0
 
                 print_if_verbose(ITERATION_FORMAT % (total_epoch, i, avg_loss, avg_acc), verbose)
 
-        epoch_training_accuracy = epoch_running_training_accuracy / len(trainings_loader)
+        epoch_training_accuracy = _validate(model, trainings_loader, device)
+        print_if_verbose(EPOCH_TRAINING_FORMAT % (total_epoch, epoch_training_accuracy), verbose)
 
         return epoch_training_accuracy
 
     def validate(self, model: torch.nn.Module, validation_loader: torch.utils.data.DataLoader,
-                 device: str, epoch: int, save_best: bool, folder: str, filename: str,
-                 plotter: solver_visualization.SolverPlotter, verbose: bool):
+                 device: str, epoch: int, plotter: solver_visualization.SolverPlotter, verbose: bool):
         """
         Validates the model using the data provided by the validation loader
 
@@ -143,43 +145,27 @@ class Solver:
         :param validation_loader:
         :param device:
         :param epoch:
-        :param save_best:
-        :param folder:
-        :param filename:
         :param plotter:
         :param verbose:
         :return:
         """
-        total_validation_samples, correct_validation_samples = 0, 0
-
-        model.eval()
-        with torch.no_grad():
-            for data in validation_loader:
-                inputs, labels = data[0].to(device), data[1].to(device)
-                outputs = model(inputs)
-                _, predicted_val_labels = torch.max(outputs.data, 1)
-                total_validation_samples += labels.size(0)
-                correct_validation_samples += (
-                        predicted_val_labels == labels).sum().item()
-
-        val_accuracy = correct_validation_samples / total_validation_samples
+        val_accuracy = _validate(model, validation_loader, device)
         self.epoch_validation_accuracy_history[epoch] = val_accuracy
 
+        new_best = False
         if val_accuracy > self.best_validation_accuracy:
             self.best_validation_accuracy = val_accuracy
             self.best_model_parameters = copy.deepcopy(model).cpu().state_dict()
-            # self.best_model_parameters = model.state_dict()
             self.best_solver = copy.deepcopy(self)
             self.best_solver.best_solver = None
+            new_best = True
 
-            if save_best:
-                self.save_best_solver(folder=folder, filename=filename, verbose=False)
-
-        print_if_verbose(len(HEADER) * "-", verbose)
-        print_if_verbose(VALIDATION_FORMAT % (epoch, val_accuracy), verbose)
+        print_if_verbose(EPOCH_VALIDATION_FORMAT % (epoch, val_accuracy), verbose)
 
         if plotter:
             plotter.append_epoch_validation_accuracy(epoch, val_accuracy)
+
+        return new_best
 
     def train(self, training: dict = None, saving: dict = None):
 
@@ -242,8 +228,11 @@ class Solver:
                 plotter.append_epoch_training_accuracy(total_epoch, self.epoch_training_accuracy_history[total_epoch])
 
             if validation_loader:
-                self.validate(model, validation_loader, device, total_epoch,
-                              save_best, folder, filename, plotter, verbose)
+                new_best = self.validate(model, validation_loader, device, total_epoch,
+                                         save_best, folder, filename, plotter, verbose)
+
+                if save_best and new_best:
+                    self.save_best_solver(folder=folder, filename=filename, verbose=False)
 
             print_if_verbose(verbose=verbose)
 
@@ -287,18 +276,17 @@ class Solver:
         Prints the whole log
         """
 
-        print("Currently broken!")
-
         for epoch, epoch_training_accuracy in self.epoch_training_accuracy_history.items():
             print(HEADER)
 
             for iteration, value in self.training_loss_history[epoch].items():
                 print(ITERATION_FORMAT %
-                      (epoch, iteration, value, self.training_loss_history[epoch][iteration])
+                      (epoch, iteration, value, self.training_accuracy_history[epoch][iteration])
                       )
+            print(EPOCH_TRAINING_FORMAT % (epoch, epoch_training_accuracy))
 
             if epoch in self.epoch_validation_accuracy_history.items():
-                print(VALIDATION_FORMAT % (epoch, self.epoch_validation_accuracy_history[epoch]))
+                print(EPOCH_VALIDATION_FORMAT % (epoch, self.epoch_validation_accuracy_history[epoch]))
 
             print()
 
@@ -414,6 +402,30 @@ def predict_samples(model, dataloader, classes=None, num_samples=8):
                                        for j in range(real_num_samples))))
 
 
+def _validate(model: torch.nn.Module, validation_loader: torch.utils.data.DataLoader, device: str = "cpu"):
+    """
+    Calculates the correct to total classified ratio of data points in the loader
+
+    :param model:
+    :param validation_loader:
+    :param device:
+    :return:
+    """
+    model.eval()
+    total_validation_samples, correct_validation_samples = 0, 0
+
+    with torch.no_grad():
+        for data in validation_loader:
+            inputs, labels = data[0].to(device), data[1].to(device)
+            outputs = model(inputs)
+            _, predicted_val_labels = torch.max(outputs.data, 1)
+            total_validation_samples += labels.size(0)
+            correct_validation_samples += (
+                    predicted_val_labels == labels).sum().item()
+
+    return correct_validation_samples / total_validation_samples
+
+
 def parse_training_settings(training: dict):
     """
     Parse the training settings dict
@@ -470,4 +482,3 @@ def print_if_verbose(message="", verbose=False):
     """
     if verbose:
         print(message)
-
