@@ -160,9 +160,9 @@ class Solver:
         new_best = False
         if val_accuracy > self.best_validation_accuracy:
             self.best_validation_accuracy = val_accuracy
-            self.best_model_parameters = copy.deepcopy(self.model).cpu().state_dict()
-            self.best_solver = copy.deepcopy(self)
-            self.best_solver.best_solver = None
+            # self.best_model_parameters = copy.deepcopy(self.model).cpu().state_dict()
+            # self.best_solver = copy.deepcopy(self)
+            # self.best_solver.best_solver = None
             new_best = True
 
         print_if_verbose(EPOCH_VALIDATION_FORMAT % (epoch, val_accuracy), verbose)
@@ -227,7 +227,7 @@ class Solver:
                 plotter.append_epoch_training_accuracy(total_epoch, self.epoch_training_accuracy_history[total_epoch])
 
             if validation_loader:
-                new_best = self.validate(validation_loader, device, total_epoch, verbose)
+                new_best = self.validate(validation_loader, device, total_epoch, plotter, verbose)
 
                 if save_best and new_best:
                     self.save_best_solver(folder=folder, filename=filename, verbose=False)
