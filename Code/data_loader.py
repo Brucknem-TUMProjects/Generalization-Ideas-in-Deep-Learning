@@ -56,6 +56,7 @@ def load_CIFAR10_dataset(train,
                                             download=download,
                                             transform=transform)
 
+    np.random.seed(123456789)
     if random_labels:
         labels = list(trainset.class_to_idx.values())
         trainset.targets = np.random.choice(labels, len(trainset))
@@ -99,12 +100,14 @@ def get_CIFAR10_dataloader(train,
 
     helpers.print_separator()
 
+    random.seed(123456789)
+    subset_indices = random.sample(range(len(trainset)), subset_size)
+
     return torch.utils.data.DataLoader(
         trainset,
         batch_size=batch_size,
         num_workers=num_workers,
-        sampler=torch.utils.data.sampler.SubsetRandomSampler(
-            random.sample(range(0, len(trainset)), subset_size)))
+        sampler=torch.utils.data.sampler.SubsetRandomSampler(subset_indices))
 
 
 def get_CIFAR10_classes():

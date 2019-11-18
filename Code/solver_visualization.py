@@ -153,6 +153,7 @@ class SolverPlotter:
             accuracy_history.extend(iterations.values())
             for iteration in iterations.keys():
                 flattened_training_x_labels += [start_iteration + iteration]
+        accuracy_history = [a if a <= 1.0 else 1.0 for a in accuracy_history]
 
         accuracy_plt = figure(**upper_row_settings,
                               title='Training Accuracy')

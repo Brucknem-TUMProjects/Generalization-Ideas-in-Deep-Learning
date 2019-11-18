@@ -16,21 +16,32 @@ def margins(model: torch.nn.Module, trainings_loader: data_loader) -> List[float
     :return:
     """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model.cuda(device)
+    model.eval()
+    model.to(device)
 
     all_margins = []
+    wrong_labelled = 0
 
     with torch.no_grad():
         for data in trainings_loader:
             inputs, labels = data[0].cuda(device), data[1].numpy()
             outputs = model(inputs).cpu().numpy()
             correct_labels = []
+
             for i in range(len(labels)):
+                outputs[i] -= np.min(outputs[i])
+                outputs[i] /= np.sum(outputs[i])
+                predicted = np.argmax(outputs[i])
+                correct = labels[i]
+                if predicted != correct:
+                    wrong_labelled += 1
                 correct_labels.append(outputs[i, labels[i]])
                 outputs[i, labels[i]] = -np.inf
-            max_other = np.amax(outputs, axis=1)
-            margin = correct_labels - max_other
-            all_margins.extend(margin)
+                max_other = np.amax(outputs[i])
+                margin = correct_labels - max_other
+                all_margins.extend(margin)
+
+        print(wrong_labelled)
 
     return all_margins
 
@@ -46,6 +57,10 @@ def gamma_margin(model: torch.nn.Module, trainings_loader: data_loader, eps: flo
     :return:
     """
     all_margins = sorted(margins(model, trainings_loader))
+    if all_margins[0] < 0:
+        print(all_margins[:10])
+        raise ValueError("Found wrong labeled data.")
+
     eps_m = np.math.ceil(eps * len(all_margins))
     return all_margins[eps_m]
 

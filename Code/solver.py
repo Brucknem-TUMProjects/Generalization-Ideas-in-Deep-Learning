@@ -98,7 +98,7 @@ class Solver:
 
         self.model.train()
 
-        index_correction = 1
+        passed_iterations = 0
         for i, data in enumerate(trainings_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data[0].to(device), data[1].to(device)
@@ -118,10 +118,12 @@ class Solver:
             # print statistics
             running_loss += loss.item()
             running_training_accuracy += train_acc
-
+            passed_iterations += 1
             if i and i % log_every == 0:
-                avg_loss = running_loss / (log_every - index_correction)
-                avg_acc = running_training_accuracy / (log_every - index_correction)
+                avg_loss = running_loss / passed_iterations
+                avg_acc = running_training_accuracy / passed_iterations
+
+                # print(passed_iterations)
 
                 self.training_loss_history.setdefault(total_epoch, {})[i] = avg_loss
                 self.training_accuracy_history.setdefault(total_epoch, {})[i] = avg_acc
@@ -130,7 +132,7 @@ class Solver:
                     plotter.append_training_loss(total_epoch * len(trainings_loader) + i, avg_loss)
                     plotter.append_training_accuracy(total_epoch * len(trainings_loader) + i, avg_acc)
 
-                running_loss, running_training_accuracy, index_correction = 0.0, 0.0, 0
+                running_loss, running_training_accuracy, passed_iterations = 0.0, 0.0, 0
 
                 print_if_verbose(ITERATION_FORMAT % (total_epoch, i, avg_loss, avg_acc), verbose)
 
@@ -422,6 +424,7 @@ def _validate(model: torch.nn.Module, validation_loader: torch.utils.data.DataLo
     :return:
     """
     model.eval()
+    # print(next(model.parameters()).is_cuda)
     total_validation_samples, correct_validation_samples = 0, 0
 
     with torch.no_grad():
