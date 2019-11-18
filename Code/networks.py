@@ -5,55 +5,24 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 
-class SeminarNet(nn.Module):
+class TwoLayerPerceptron(nn.Module):
     """
-    Light VGG for seminar
+    Two layer perceptron for MNIST
     """
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         """
         Constructor
         """
-        super(SeminarNet, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(128, 256, kernel_size=3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            # nn.Conv2d(256, 512, kernel_size=3, padding=1),
-            # nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=2, stride=2)
-        )
-        self.classifier = nn.Sequential(
-            nn.Dropout(),
-            # nn.Linear(2048, 512),
-            nn.Linear(4096, 512),
-            nn.ReLU(True),
-            nn.Dropout(),
-            nn.Linear(512, 256),
-            nn.ReLU(True),
-            nn.Linear(256, 10),
-        )
+        super(TwoLayerPerceptron, self).__init__()
+        hidden_units = kwargs.get('hidden_units', 32)
+        self.fc1 = nn.Linear(28*28, hidden_units)
+        self.fc2 = nn.Linear(hidden_units, 10)
 
     def forward(self, x):
-        """
-        Forward pass of the net
-
-        :param x:
-        :return:
-        """
-        x = self.features(x)
-        # print(x.shape)
-        x = x.view(x.size(0), -1)
-        # print(x.shape)
-        x = self.classifier(x)
+        x = x.view(-1, 28 * 28)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
 
         return x
 
@@ -62,7 +31,8 @@ class ExampleNet(nn.Module):
     """
     Small testing network
     """
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         """
         Constructor
         """
@@ -211,49 +181,49 @@ cfg = {
 }
 
 
-def vgg11():
+def vgg11(**kwargs):
     """VGG 11-layer model (configuration "A")"""
 
     return VGG(make_layers(cfg['A']))
 
 
-def vgg11_bn():
+def vgg11_bn(**kwargs):
     """VGG 11-layer model (configuration "A") with batch normalization"""
 
     return VGG(make_layers(cfg['A'], batch_norm=True))
 
 
-def vgg13():
+def vgg13(**kwargs):
     """VGG 13-layer model (configuration "B")"""
 
     return VGG(make_layers(cfg['B']))
 
 
-def vgg13_bn():
+def vgg13_bn(**kwargs):
     """VGG 13-layer model (configuration "B") with batch normalization"""
 
     return VGG(make_layers(cfg['B'], batch_norm=True))
 
 
-def vgg16():
+def vgg16(**kwargs):
     """VGG 16-layer model (configuration "D")"""
 
     return VGG(make_layers(cfg['D']))
 
 
-def vgg16_bn():
+def vgg16_bn(**kwargs):
     """VGG 16-layer model (configuration "D") with batch normalization"""
 
     return VGG(make_layers(cfg['D'], batch_norm=True))
 
 
-def vgg19():
+def vgg19(**kwargs):
     """VGG 19-layer model (configuration "E")"""
 
     return VGG(make_layers(cfg['E']))
 
 
-def vgg19_bn():
+def vgg19_bn(**kwargs):
     """VGG 19-layer model (configuration 'E') with batch normalization"""
 
     return VGG(make_layers(cfg['E'], batch_norm=True))

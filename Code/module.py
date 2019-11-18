@@ -5,7 +5,6 @@ CLI trainer
 import argparse
 import shutil
 
-import data_loader
 import networks
 from solver import *
 
@@ -35,7 +34,7 @@ PARSER.add_argument("--file",
 KNOWN_SETS = ['cifar10']
 DATA_SET = KNOWN_SETS[0]
 PARSER.add_argument("--data_set",
-                    "-ts",
+                    "-ds",
                     help="specify the data set (default: %s)" % DATA_SET)
 
 BATCH_SIZE = 4
@@ -66,6 +65,11 @@ PARSER.add_argument("--validate",
                     help="validate accuracy after each epoch",
                     action="store_true")
 
+HIDDEN_UNITS = 32
+PARSER.add_argument("--hidden_units",
+                    "-hu",
+                    help="specify the number of hidden units for the TwoLayerPerceptron model (default: %s)" %
+                         HIDDEN_UNITS)
 NUM_EPOCHS = -1
 PARSER.add_argument("--num_epochs",
                     "-e",
@@ -144,21 +148,21 @@ def train():
                              filename=FILENAME)
 
     solver.train(
-                 training={
-                     'epochs': NUM_EPOCHS,
-                     'log_every': LOG_EVERY,
-                     'plot': PLOT,
-                     'verbose': VERBOSE,
-                     'save_on_training_100': ARGS.save_on_training_100,
-                     'validate': ARGS.validate
-                 },
-                 saving={
-                     'latest': SAVE_LATEST,
-                     'nth_epoch': SAVE_EVERY,
-                     'best': ARGS.save_best,
-                     'folder': FOLDER,
-                     'filename': FILENAME
-                 })
+        training={
+            'epochs': NUM_EPOCHS,
+            'log_every': LOG_EVERY,
+            'plot': PLOT,
+            'verbose': VERBOSE,
+            'save_on_training_100': ARGS.save_on_training_100,
+            'validate': ARGS.validate
+        },
+        saving={
+            'latest': SAVE_LATEST,
+            'nth_epoch': SAVE_EVERY,
+            'best': ARGS.save_best,
+            'folder': FOLDER,
+            'filename': FILENAME
+        })
 
     solver.save_solver(filename=FILENAME, folder=FOLDER)
 
@@ -182,6 +186,8 @@ SUBSET_SIZE = int(
     ARGS.subset_size if ARGS.subset_size is not None else SUBSET_SIZE)
 CONFUSION_SET_SIZE = int(
     ARGS.confusion_set_size if ARGS.confusion_set_size is not None else CONFUSION_SET_SIZE)
+HIDDEN_UNITS = int(
+    ARGS.hidden_units if ARGS.hidden_units is not None else HIDDEN_UNITS)
 
 FOLDER = ARGS.dir if ARGS.dir is not None else FOLDER
 FILENAME = ARGS.file if ARGS.file is not None else FILENAME
@@ -196,7 +202,7 @@ if ARGS.model:
     if not hasattr(networks, ARGS.model):
         raise ValueError('Invalid model: "%s"' % ARGS.model)
     MODEL = ARGS.model
-MODEL = getattr(networks, MODEL)()
+MODEL = getattr(networks, MODEL)(**{'hidden_units': HIDDEN_UNITS})
 
 if ARGS.data_set:
     if not hasattr(data_loader, ARGS.data_set):

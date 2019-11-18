@@ -1,6 +1,7 @@
 # DL stuff
 data/
 cifar*
+mnist*
 *.pth
 
 # Byte-compiled / optimized / DLL files
