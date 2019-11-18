@@ -101,6 +101,11 @@ SAVE_LATEST = -1
 PARSER.add_argument("--save_latest",
                     "-sl",
                     help="save the solver state after every nth epoch (default: %s)" % SAVE_LATEST)
+CONFUSION_SET_SIZE = 0
+PARSER.add_argument("--confusion_set_size",
+                    "-cs",
+                    help="number of additional, randomly labelled data points to confuse the model (default: %s)" %
+                         CONFUSION_SET_SIZE)
 PARSER.add_argument("--debug", help="debug script", action="store_true")
 
 # read arguments from the command line
@@ -130,7 +135,8 @@ def train():
                 'dataset': DATA_SET,
                 'batch_size': BATCH_SIZE,
                 'subset_size': SUBSET_SIZE,
-                'random_labels': RANDOM_LABELS
+                'random_labels': RANDOM_LABELS,
+                'confusion_set_size': CONFUSION_SET_SIZE
             }
         )
     else:
@@ -174,6 +180,8 @@ SAVE_LATEST = int(
     ARGS.save_latest if ARGS.save_latest is not None else SAVE_LATEST)
 SUBSET_SIZE = int(
     ARGS.subset_size if ARGS.subset_size is not None else SUBSET_SIZE)
+CONFUSION_SET_SIZE = int(
+    ARGS.confusion_set_size if ARGS.confusion_set_size is not None else CONFUSION_SET_SIZE)
 
 FOLDER = ARGS.dir if ARGS.dir is not None else FOLDER
 FILENAME = ARGS.file if ARGS.file is not None else FILENAME

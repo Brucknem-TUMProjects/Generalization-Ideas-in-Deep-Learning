@@ -1,7 +1,6 @@
 """
 Nice solver my Marcel Bruckner.
 """
-import copy
 from collections import OrderedDict
 from typing import Callable, Optional, List
 
@@ -119,7 +118,7 @@ class Solver:
             running_loss += loss.item()
             running_training_accuracy += train_acc
             passed_iterations += 1
-            if i and i % log_every == 0:
+            if i == len(trainings_loader) - 1 or i % log_every == 0:
                 avg_loss = running_loss / passed_iterations
                 avg_acc = running_training_accuracy / passed_iterations
 
@@ -198,11 +197,13 @@ class Solver:
 
         data_loader_func = getattr(data_loader, self.data['dataset'])
         trainings_loader = data_loader_func(
-            True, self.data['batch_size'], self.data['subset_size'], self.data['random_labels'])
+            True, self.data['batch_size'], self.data['subset_size'],
+            self.data['random_labels'], self.data['confusion_set_size'])
         validation_loader = None
         if validate:
             validation_loader = data_loader_func(
-                False, self.data['batch_size'], self.data['subset_size'], self.data['random_labels'])
+                False, self.data['batch_size'], self.data['subset_size'],
+                self.data['random_labels'])
 
         previous_epochs = np.max(list(self.epoch_training_accuracy_history.keys()) or [-1]) + 1
 
@@ -211,10 +212,10 @@ class Solver:
         if verbose:
             helpers.print_separated("Starting training on model: %s" % self.model)
             helpers.print_separated("Epochs: %s, Logging every %s. iteration, Plotting: %s" %
-                                    (epochs, log_every, plot))
+                                    (epochs if epochs >= 0 else 'inf', log_every, plot))
 
         epoch = 0
-        while epochs == -1 or epoch < epochs:
+        while epochs < 0 or epoch < epochs:
             total_epoch = epoch + previous_epochs
 
             adjust_learning_rate(optimizer, total_epoch, self.strategy['config']['lr'])
@@ -338,8 +339,6 @@ class Solver:
     def parse_data_settings(self):
         """
         Parse the data settings dict
-
-        :param data
         """
         data = self.data or {}
 
@@ -347,6 +346,7 @@ class Solver:
         self.data['batch_size'] = data.get('batch_size', 16)
         self.data['subset_size'] = data.get('subset_size', -1)
         self.data['random_labels'] = data.get('random_labels', False)
+        self.data['confusion_set_size'] = data.get('confusion_set_size', 0)
 
     def parse_strategy_settings(self):
         """
