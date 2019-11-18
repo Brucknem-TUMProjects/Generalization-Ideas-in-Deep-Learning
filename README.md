@@ -12,3 +12,7 @@ I will explore different measures for the generalization ability of neural nets.
 - [Rademacher and Gaussian Complexities: Risk Bounds and Structural Results](http://www.jmlr.org/papers/volume3/bartlett02a/bartlett02a.pdf)
 - [Understanding Deep Learning requires rethinking Generalization](https://arxiv.org/pdf/1611.03530.pdf)
 - [Norm-Based Capacity Control in Neural Networks](https://arxiv.org/pdf/1503.00036.pdf)
+
+# Important links
+
+- [Margin](https://en.wikipedia.org/wiki/Margin_of_error)
