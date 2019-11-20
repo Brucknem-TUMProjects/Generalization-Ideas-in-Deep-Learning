@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
+from torch.utils.data import Dataset
 
 import helpers
 
@@ -175,3 +176,37 @@ def get_CIFAR10_classes():
         'plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship',
         'truck'
     ]
+
+
+class TestDataset(Dataset):
+    """
+    Dataset for testing
+    """
+    def __init__(self):
+        self.data_points = [
+            torch.tensor(np.array([1, 1]), dtype=torch.float),
+            torch.tensor(np.array([2, 2]), dtype=torch.float),
+            torch.tensor(np.array([3, 3]), dtype=torch.float),
+            torch.tensor(np.array([4, 4]), dtype=torch.float),
+            torch.tensor(np.array([5, 5]), dtype=torch.float),
+            torch.tensor(np.array([6, 6]), dtype=torch.float)
+        ]
+        self.labels = torch.tensor(np.array([1, 1, 1, 1, 1, 1]))
+
+    def __len__(self):
+        return len(self.data_points)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        return self.data_points[idx], self.labels[idx]
+
+
+def get_test_data_loader():
+    """
+    Test set data loader
+
+    :return:
+    """
+    return torch.utils.data.DataLoader(TestDataset(), 1, True, num_workers=4)
+

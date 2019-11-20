@@ -2,7 +2,44 @@ import math
 
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 import torchvision.models as models
+
+__all__ = [locals()]
+
+
+def TorchVGG16(**kwargs):
+    model = torchvision.models.vgg16_bn()
+    model.classifier[6] = nn.Linear(4096, 10)
+    return model
+
+
+class MultiLayerPerceptron(nn.Module):
+    """
+    Two layer perceptron for MNIST
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Constructor
+        """
+        super(MultiLayerPerceptron, self).__init__()
+        self._layers = kwargs.get('layers', [32])
+
+        layers = [nn.Linear(self._layers[0], self._layers[1])]
+
+        for i in range(1, len(self._layers) - 1):
+            layers.append(nn.Linear(self._layers[i], self._layers[i + 1]))
+
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = x.view(-1, self._layers[0])
+
+        for layer in self.layers:
+            x = F.relu(layer(x))
+
+        return x
 
 
 class TwoLayerPerceptron(nn.Module):
@@ -16,7 +53,7 @@ class TwoLayerPerceptron(nn.Module):
         """
         super(TwoLayerPerceptron, self).__init__()
         hidden_units = kwargs.get('hidden_units', 32)
-        self.fc1 = nn.Linear(28*28, hidden_units)
+        self.fc1 = nn.Linear(28 * 28, hidden_units)
         self.fc2 = nn.Linear(hidden_units, 10)
 
     def forward(self, x):

@@ -21,6 +21,8 @@ EPOCH_TRAINING_FORMAT = len(HEADER) * "-" + "\n" + \
 EPOCH_VALIDATION_FORMAT = '[%5d]       validation accuracy: %17.8f'
 HEADER += "\n" + len(HEADER) * "-"
 
+__all__ = [locals()]
+
 
 class Solver:
     """ This class trains the given NN model. """
@@ -98,6 +100,7 @@ class Solver:
         self.model.train()
 
         passed_iterations = 0
+
         for i, data in enumerate(trainings_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data[0].to(device), data[1].to(device)

@@ -5,8 +5,9 @@ CLI trainer
 import argparse
 import shutil
 
+import data_loader
 import networks
-from solver import *
+from solver import Solver, load_solver
 
 # initiate the parser
 PARSER = argparse.ArgumentParser()
@@ -202,7 +203,10 @@ if ARGS.model:
     if not hasattr(networks, ARGS.model):
         raise ValueError('Invalid model: "%s"' % ARGS.model)
     MODEL = ARGS.model
-MODEL = getattr(networks, MODEL)(**{'hidden_units': HIDDEN_UNITS})
+MODEL = getattr(networks, MODEL)(**{
+    'hidden_units': HIDDEN_UNITS,
+    'layers': [28*28, 8192, 10]
+})
 
 if ARGS.data_set:
     if not hasattr(data_loader, ARGS.data_set):
