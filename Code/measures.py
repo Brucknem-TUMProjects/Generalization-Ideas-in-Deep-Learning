@@ -1,12 +1,14 @@
-import concurrent
 import copy
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Callable
 
 import numpy as np
 import torch
 
 import data_loader
+import optimizers
+from solver import load_solver
 
 
 def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]:
@@ -28,7 +30,6 @@ def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]
         for data in training_loader:
             inputs, labels = data[0].cuda(device), data[1].numpy()
             outputs = model(inputs).cpu().numpy()
-            correct_labels = []
 
             for i in range(len(labels)):
                 outputs[i] -= np.min(outputs[i])
@@ -37,13 +38,13 @@ def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]
                 correct = labels[i]
                 if predicted != correct:
                     wrong_labelled += 1
-                correct_labels.append(outputs[i, labels[i]])
+                correct_labels = outputs[i][labels[i]]
                 outputs[i, labels[i]] = -np.inf
                 max_other = np.amax(outputs[i])
                 margin = correct_labels - max_other
-                all_margins.extend(margin)
+                all_margins.append(margin)
 
-        # print(wrong_labelled)
+        # print(wrong_labelled, len(all_margins))
 
     return all_margins
 
@@ -84,16 +85,17 @@ def norm_product(layers: OrderedDict, order: int = None, with_hidden: bool = Fal
 
         layer_result = 1
         try:
-            print("Processing layer %s" % layer)
+            # print("Processing layer %s" % layer)
             if layer.endswith('weight'):
                 layer_result = np.linalg.norm(weights, ord=order)
                 if with_hidden:
                     layer_result *= weights.shape[0]
             else:
-                print("Skipping %s" % layer)
+                # print("Skipping %s" % layer)
+                pass
         except ValueError:
-            print("Layer %s has no norm. %s" % (layer, weights.shape))
-
+            # print("Layer %s has no norm. %s" % (layer, weights.shape))
+            pass
         result *= layer_result
 
     return result
@@ -141,9 +143,8 @@ def l1_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: floa
     margin = gamma_margin(model, training_loader, eps)
 
     layers = model.state_dict()
-    paths = enumerate_paths(layers)
-    paths *= 2
-    paths = paths.prod(axis=1)
+    paths, real_model_depth = enumerate_paths(layers, multiply_by_hidden_units=False, power=1, collapse_paths=True)
+    paths *= 2 ** real_model_depth
     paths = np.abs(paths)
     norm = paths.sum()
     norm **= 2
@@ -164,59 +165,110 @@ def l2_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: floa
 
     layers = model.state_dict()
 
-    paths = enumerate_paths(layers, power=2, multiply_by_hidden_units=True)
-    paths *= 4
-    paths = paths.prod(axis=1)
+    paths, real_model_depth = enumerate_paths(layers, power=2, multiply_by_hidden_units=True,
+                                              collapse_paths=True)
+    paths *= 4 ** real_model_depth
     norm = paths.sum()
 
     return (margin ** -2) * norm
 
 
-def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False, power: int = 1):
+def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False, power: int = 1,
+                    collapse_paths: bool = True):
     """
     Enumerates all paths in the given layer dict.
 
+    :param collapse_paths:
     :param layers:
     :param multiply_by_hidden_units:
     :param power:
     :return: List of list of weights representing all weights along paths
     """
-    paths = np.array([])
+    real_depth = 0
+    paths = np.array([], dtype=np.float64)
 
-    for layer in reversed(layers.keys()):
-        if not layer.endswith('weight'):
+    for layer, weights in reversed(layers.items()):
+        if not len(weights.shape) == 2:
+            print("Skipping enumeration of %s layer %s" % (weights.shape, layer))
             continue
-        weights = layers[layer].cpu().numpy()
+        print("Enumerating %s layer %s" % (weights.shape, layer))
+        weights = weights.cpu().numpy()
         rows = weights.shape[0]
+
+        real_depth += 1
 
         if not paths.any():
             paths = weights.flatten()
             paths **= power
             if multiply_by_hidden_units:
                 paths *= rows
-            paths = np.array([[i] for i in paths])
             continue
 
-        reshaped_paths = [[] for x in np.arange(rows)]
-        for i in range(len(paths)):
-            reshaped_paths[i % rows].append(paths[i])
-        paths = np.array(reshaped_paths)
-        new_paths = []
-        for i in range(len(paths)):
-            row = paths[i]
-            for element in row:
-                for other_element in weights[i % weights.shape[0]]:
-                    other_element **= power
-                    if multiply_by_hidden_units:
-                        other_element *= rows
-                    new_paths.append(np.array([*element.flatten(), other_element]))
+        if not collapse_paths:
+            paths = paths.reshape((len(paths) // rows, rows, real_depth - 1))
+            paths = paths.transpose((1, 0, 2))
+        else:
+            paths = paths.reshape((len(paths) // rows, rows)).transpose()
 
-        paths = np.array(new_paths)
-    return paths
+        weights **= power
+        if multiply_by_hidden_units:
+            weights *= rows
+
+        new_paths = np.empty((0, real_depth + 1), dtype=np.float64)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = []
+            for i in range(len(paths)):
+                incoming_paths = paths[i]
+                outgoing_edges = weights[i % weights.shape[0]]
+                futures.append(
+                    executor.submit(append_outgoing_edges, incoming_paths, outgoing_edges, real_depth, collapse_paths))
+
+            for future in futures:
+                new_paths = np.append(new_paths, future.result())
+
+            if not collapse_paths:
+                new_paths = new_paths.reshape((-1, real_depth))
+
+        paths = np.array(new_paths, dtype=np.float64)
+        print("Currently enumerated paths: ", len(paths))
+    return paths, real_depth
+
+
+def append_outgoing_edges(incoming_paths, outgoing_edges, real_depth, collapse_paths):
+    """
+    Appends the outgoing edges to the incoming paths
+
+    :param incoming_paths:
+    :param outgoing_edges:
+    :param real_depth:
+    :param collapse_paths:
+    :return:
+    """
+    new_paths = np.empty((0, real_depth + 1), dtype=np.float64)
+    for element in incoming_paths:
+        if not collapse_paths:
+            new_column = np.array([element] * len(outgoing_edges), dtype=np.float64)
+            new_path = np.column_stack([new_column, outgoing_edges])
+            new_paths = np.append(new_paths, new_path).reshape((-1, real_depth))
+        else:
+            new_path = element * outgoing_edges
+            new_paths = np.append(new_paths, new_path)
+    return new_paths
 
 
 def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data_loader, alpha: float = 5e-4,
-              iterations: int = 1e5, num_threads: int = 8):
+              iterations: float = 1e5):
+    """
+    Calculates the sharpness of the model.
+    The sharpness corresponds to robustness to adverserial pertubations on the parameter space.
+
+    :param model:
+    :param criterion:
+    :param training_loader:
+    :param alpha:
+    :param iterations:
+    :return:
+    """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     real_loss = calculate_loss(model, criterion, training_loader)
     max_loss = -np.inf
@@ -227,7 +279,9 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
     pertubated_parameters = OrderedDict()
     pertubation = OrderedDict()
 
-    for iteration in range(iterations):
+    for iteration in range(int(iterations)):
+        if not iteration % 50:
+            print(iteration)
         for layer, weights in model_parameters.items():
             pertubation[layer] = ((np.random.rand(*weights.shape) * 2) - 1) * alpha
 
@@ -235,9 +289,10 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
             pertubated_parameters[layer] = model_parameters[layer] + torch.tensor(pertubation[layer]).to(device)
 
         model.load_state_dict(pertubated_parameters)
-        loss = calculate_loss(model, criterion, training_loader)
+        loss = calculate_loss(model, criterion, training_loader) - real_loss
         if loss > max_loss:
             max_loss = loss
+            print("Found new max loss: ", max_loss)
 
     return max_loss
 
@@ -278,6 +333,14 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
 
 
 def calculate_loss(model: torch.nn.Module, criterion: Callable, training_loader: data_loader):
+    """
+    Calculates the loss of the model.
+
+    :param model:
+    :param criterion:
+    :param training_loader:
+    :return:
+    """
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.eval()
@@ -294,3 +357,54 @@ def calculate_loss(model: torch.nn.Module, criterion: Callable, training_loader:
         total_loss /= len(training_loader)
 
     return total_loss
+
+
+def power_iteration(A, num_simulations):
+    # Ideally choose a random vector
+    # To decrease the chance that our vector
+    # Is orthogonal to the eigenvector
+    b_k = np.random.rand(A.shape[1])
+
+    for _ in range(num_simulations):
+        # calculate the matrix-by-vector product Ab
+        b_k1 = np.dot(A, b_k)
+
+        # calculate the norm
+        b_k1_norm = np.linalg.norm(b_k1)
+
+        # re normalize the vector
+        b_k = b_k1 / b_k1_norm
+
+    return b_k
+
+
+if __name__ == '__main__':
+    solver = load_solver(filename='solver_e_reached_100.pth', folder='Seminar/')
+    model = solver.model
+    model.load_state_dict(solver.model_state)
+    data = dict(solver.data)
+    training_loader = getattr(data_loader, data['dataset'])
+    del data['dataset']
+    training_loader = training_loader(True, **data)
+
+    eps = 0.01
+
+    l2 = l2_norm(model, training_loader, eps)
+    print("L2 norm: ", l2)
+    spectral = spectral_norm(model, training_loader, eps)
+    print("Spectral norm: ", spectral)
+    try:
+        l2_path = l2_path_norm(model, training_loader, eps)
+        print("L2-path norm: ", l2_path)
+    except ValueError:
+        print("l2-path norm does not exist")
+    try:
+        l1_path = l1_path_norm(model, training_loader, eps)
+        print("L1-path norm: ", l1_path)
+    except ValueError:
+        print("l1-path norm does not exist")
+
+    criterion = getattr(optimizers, solver.strategy['criterion'])()
+    sharpness = sharpness(model, criterion, training_loader, alpha=5e-4, iterations=1e5)
+
+    print("lol")

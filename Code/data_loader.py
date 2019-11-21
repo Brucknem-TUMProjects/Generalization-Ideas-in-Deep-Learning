@@ -24,11 +24,11 @@ MNIST_DEFAULT_TRANSFORM = transforms.Compose([
 ])
 
 
-def mnist(train, batch_size, subset_size, random_labels, confusion_size=0, verbose=True):
+def mnist(train, batch_size, subset_size, random_labels, confusion_set_size=0, verbose=True):
     """
     Loads the MNIST digit dataset
 
-    :param confusion_size:
+    :param confusion_set_size:
     :param verbose:
     :param train:
     :param batch_size:
@@ -41,15 +41,15 @@ def mnist(train, batch_size, subset_size, random_labels, confusion_size=0, verbo
                           batch_size=batch_size,
                           subset_size=subset_size,
                           random_labels=random_labels,
-                          confusion_size=confusion_size,
+                          confusion_set_size=confusion_set_size,
                           verbose=verbose)
 
 
-def cifar10(train, batch_size, subset_size, random_labels, confusion_size=0, verbose=True):
+def cifar10(train, batch_size, subset_size, random_labels, confusion_set_size=0, verbose=True):
     """
     Loads the CIFAR-10 dataset
 
-    :param confusion_size:
+    :param confusion_set_size:
     :param verbose:
     :param train:
     :param batch_size:
@@ -62,7 +62,7 @@ def cifar10(train, batch_size, subset_size, random_labels, confusion_size=0, ver
                           batch_size=batch_size,
                           subset_size=subset_size,
                           random_labels=random_labels,
-                          confusion_size=confusion_size,
+                          confusion_set_size=confusion_set_size,
                           verbose=verbose)
 
 
@@ -112,13 +112,13 @@ def get_dataloader(dataset_name,
                    transform=None,
                    subset_size=-1,
                    random_labels=False,
-                   confusion_size=0,
+                   confusion_set_size=0,
                    verbose=True):
     """
     Loads the CIFAR-10 dataset and creates a data loader
 
     :param dataset_name:
-    :param confusion_size:
+    :param confusion_set_size:
     :param train:
     :param batch_size:
     :param num_workers:
@@ -133,7 +133,7 @@ def get_dataloader(dataset_name,
         message = "Loading %s set: %s, Batch size: %s" % \
                   ('trainings' if train else 'validation', dataset_name, batch_size)
         message = message + ", Subset size: %s" % subset_size if subset_size >= 0 else message
-        message = message + ", Confusion set size: %s" % confusion_size if confusion_size > 0 else message
+        message = message + ", Confusion set size: %s" % confusion_set_size if confusion_set_size > 0 else message
         message = message + ", Random labels" if random_labels else message
         print(message)
 
@@ -145,18 +145,18 @@ def get_dataloader(dataset_name,
 
     if subset_size < 0:
         subset_size = len(dataset)
-    subset_size = min(subset_size + confusion_size, len(dataset))
+    subset_size = min(subset_size + confusion_set_size, len(dataset))
 
     helpers.print_separator()
 
     random.seed(123456789)
     subset_indices = random.sample(range(len(dataset)), subset_size)
 
-    if confusion_size:
+    if confusion_set_size:
         labels = list(dataset.class_to_idx.values())
-        confusing_indices = subset_indices[-confusion_size:]
+        confusing_indices = subset_indices[-confusion_set_size:]
         targets = np.array(dataset.targets)
-        targets[confusing_indices] = np.random.choice(labels, confusion_size)
+        targets[confusing_indices] = np.random.choice(labels, confusion_set_size)
         dataset.targets = list(targets)
 
     return torch.utils.data.DataLoader(
