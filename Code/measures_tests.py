@@ -11,8 +11,6 @@ from solver import Solver
 
 
 if __name__ == '__main__':
-    print(measures.power_iteration(np.array([[0.5, 0.5], [0.2, 0.8]]), 10))
-else:
     FC_PATHS = [
         [19, 7, 1],
         [19, 7, 2],

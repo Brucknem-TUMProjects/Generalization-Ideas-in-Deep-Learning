@@ -84,17 +84,22 @@ def norm_product(layers: OrderedDict, order: int = None, with_hidden: bool = Fal
             weights = weights.cpu().numpy()
 
         layer_result = 1
-        try:
-            # print("Processing layer %s" % layer)
-            if layer.endswith('weight'):
+        if layer.endswith('weight'):
+            try:
                 layer_result = np.linalg.norm(weights, ord=order)
-                if with_hidden:
-                    layer_result *= weights.shape[0]
-            else:
-                # print("Skipping %s" % layer)
-                pass
-        except ValueError:
-            # print("Layer %s has no norm. %s" % (layer, weights.shape))
+            except ValueError:
+                layer_result = 0
+                try:
+                    for row in weights:
+                        for convolution_filter in row:
+                            layer_result += np.linalg.norm(convolution_filter, ord=order)
+                except ValueError:
+                    print("Skipping ", layer)
+
+            if with_hidden:
+                layer_result *= weights.shape[0]
+        else:
+            # print("Skipping %s" % layer)
             pass
         result *= layer_result
 
@@ -187,11 +192,13 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
     real_depth = 0
     paths = np.array([], dtype=np.float64)
 
+    print("Enumerating paths")
+
     for layer, weights in reversed(layers.items()):
         if not len(weights.shape) == 2:
-            print("Skipping enumeration of %s layer %s" % (weights.shape, layer))
+            # print("Skipping enumeration of %s layer %s" % (weights.shape, layer))
             continue
-        print("Enumerating %s layer %s" % (weights.shape, layer))
+        # print("Enumerating %s layer %s" % (weights.shape, layer))
         weights = weights.cpu().numpy()
         rows = weights.shape[0]
 
@@ -359,27 +366,9 @@ def calculate_loss(model: torch.nn.Module, criterion: Callable, training_loader:
     return total_loss
 
 
-def power_iteration(A, num_simulations):
-    # Ideally choose a random vector
-    # To decrease the chance that our vector
-    # Is orthogonal to the eigenvector
-    b_k = np.random.rand(A.shape[1])
-
-    for _ in range(num_simulations):
-        # calculate the matrix-by-vector product Ab
-        b_k1 = np.dot(A, b_k)
-
-        # calculate the norm
-        b_k1_norm = np.linalg.norm(b_k1)
-
-        # re normalize the vector
-        b_k = b_k1 / b_k1_norm
-
-    return b_k
-
-
 if __name__ == '__main__':
-    solver = load_solver(filename='solver_e_reached_100.pth', folder='Seminar/')
+    solver = load_solver(filename='solver_e_reached_100.pth', folder='../brucknem/vgg16_bn_confusion_5000/')
+    # solver = load_solver(filename='solver_e_reached_100.pth', folder='Seminar/ExampleNet_1000')
     model = solver.model
     model.load_state_dict(solver.model_state)
     data = dict(solver.data)
