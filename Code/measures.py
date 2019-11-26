@@ -33,8 +33,6 @@ def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]
             outputs = model(inputs).cpu().numpy()
 
             for i in range(len(labels)):
-                outputs[i] -= np.min(outputs[i])
-                outputs[i] /= np.sum(outputs[i])
                 predicted = np.argmax(outputs[i])
                 correct = labels[i]
 
