@@ -1,3 +1,4 @@
+import argparse
 import copy
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -8,7 +9,7 @@ import torch
 
 import data_loader
 import optimizers
-from solver import load_solver
+from solver import load_solver, Solver
 
 
 def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]:
@@ -49,7 +50,7 @@ def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]
     return all_margins
 
 
-def gamma_margin(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.01) -> float:
+def gamma_margin(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.05) -> float:
     """
     Lowest value of gamma so that ceil(eps * m) data points have a margin lower than gamma.
     m = #datapoints
@@ -60,12 +61,14 @@ def gamma_margin(model: torch.nn.Module, training_loader: data_loader, eps: floa
     :return:
     """
     all_margins = sorted(margins(model, training_loader))
-    if all_margins[0] < 0:
-        print(all_margins[:10])
-        raise ValueError("Found wrong labeled data.")
-
     eps_m = np.math.ceil(eps * len(all_margins))
-    return all_margins[eps_m]
+    margin = all_margins[eps_m]
+
+    if margin < 0:
+        print("Margin is less than 0.")
+        # raise ValueError("Margin is less than 0.")
+
+    return margin
 
 
 def norm_product(layers: OrderedDict, order: int = None, with_hidden: bool = False) -> float:
@@ -106,7 +109,7 @@ def norm_product(layers: OrderedDict, order: int = None, with_hidden: bool = Fal
     return result
 
 
-def l2_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.01) -> float:
+def l2_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.05) -> float:
     """
     Calculates the product of l2 norms over layers scaled by the gamma margin
 
@@ -121,7 +124,7 @@ def l2_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0
     return (margin ** -2) * norm
 
 
-def spectral_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.01) -> float:
+def spectral_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.05) -> float:
     """
     Calculates the product of spectral norms over layers scaled by the gamma margin
 
@@ -136,7 +139,7 @@ def spectral_norm(model: torch.nn.Module, training_loader: data_loader, eps: flo
     return (margin ** -2) * norm
 
 
-def l1_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.01) -> float:
+def l1_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.05) -> float:
     """
     Calculates the product of l1 path norms over layers scaled by the gamma margin
 
@@ -157,7 +160,7 @@ def l1_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: floa
     return (margin ** -2) * norm
 
 
-def l2_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.01) -> float:
+def l2_path_norm(model: torch.nn.Module, training_loader: data_loader, eps: float = 0.05) -> float:
     """
     Calculates the product of l2 path norms over layers scaled by the gamma margin
 
@@ -192,7 +195,7 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
     real_depth = 0
     paths = np.array([], dtype=np.float64)
 
-    print("Enumerating paths")
+    # print("Enumerating paths")
 
     for layer, weights in reversed(layers.items()):
         if not len(weights.shape) == 2:
@@ -237,7 +240,7 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
                 new_paths = new_paths.reshape((-1, real_depth))
 
         paths = np.array(new_paths, dtype=np.float64)
-        print("Currently enumerated paths: ", len(paths))
+        # print("Currently enumerated paths: ", len(paths))
     return paths, real_depth
 
 
@@ -299,7 +302,7 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
         loss = calculate_loss(model, criterion, training_loader) - real_loss
         if loss > max_loss:
             max_loss = loss
-            print("Found new max loss: ", max_loss)
+            print_norm("Sharpness", max_loss)
 
     return max_loss
 
@@ -366,34 +369,69 @@ def calculate_loss(model: torch.nn.Module, criterion: Callable, training_loader:
     return total_loss
 
 
-if __name__ == '__main__':
-    solver = load_solver(filename='solver_e_reached_100.pth', folder='../brucknem/vgg16_bn_confusion_5000/')
-    # solver = load_solver(filename='solver_e_reached_100.pth', folder='Seminar/ExampleNet_1000')
-    model = solver.model
-    model.load_state_dict(solver.model_state)
-    data = dict(solver.data)
+def print_norm(norm, value):
+    print("{:15}: {:150.30f}".format(norm, value))
+
+
+def calculate_all_measures(_solver: Solver):
+    """
+
+    :param name:
+    :param _solver:
+    :return:
+    """
+    model = _solver.model
+    model.load_state_dict(_solver.model_state)
+    data = dict(_solver.data)
     training_loader = getattr(data_loader, data['dataset'])
     del data['dataset']
     training_loader = training_loader(True, **data)
 
-    eps = 0.01
+    eps = 0.05
 
     l2 = l2_norm(model, training_loader, eps)
-    print("L2 norm: ", l2)
+    print_norm("L2", l2)
     spectral = spectral_norm(model, training_loader, eps)
-    print("Spectral norm: ", spectral)
+    print_norm("Spectral", spectral)
     try:
         l2_path = l2_path_norm(model, training_loader, eps)
-        print("L2-path norm: ", l2_path)
+        print_norm("L2-path", l2_path)
     except ValueError:
         print("l2-path norm does not exist")
     try:
         l1_path = l1_path_norm(model, training_loader, eps)
-        print("L1-path norm: ", l1_path)
+        print_norm("L1-path", l1_path)
     except ValueError:
         print("l1-path norm does not exist")
 
-    criterion = getattr(optimizers, solver.strategy['criterion'])()
-    sharpness = sharpness(model, criterion, training_loader, alpha=5e-4, iterations=1e5)
+    criterion = getattr(optimizers, _solver.strategy['criterion'])()
+    s = sharpness(model, criterion, training_loader, alpha=5e-4, iterations=1e100)
+    print_norm("Sharpness", s)
+    return l2, spectral, l2_path, l1_path, s
 
-    print("lol")
+
+if __name__ == '__main__':
+    # initiate the parser
+    PARSER = argparse.ArgumentParser()
+
+    FOLDER = '/storage/slurm/brucknem/'
+    PARSER.add_argument("--dir",
+                        "-d",
+                        help="specify the directory (default: %s)" % FOLDER)
+
+    FILENAME = 'solver_e_reached_100.pth'
+    PARSER.add_argument("--file",
+                        "-f",
+                        help="specify the filename (default: %s)" % FILENAME)
+
+    # read arguments from the command line
+    ARGS = PARSER.parse_args()
+
+    FOLDER = ARGS.dir if ARGS.dir is not None else FOLDER
+    FILENAME = ARGS.file if ARGS.file is not None else FILENAME
+
+    if not FOLDER.endswith('/'):
+        FOLDER += '/'
+
+    solver = load_solver(folder=FOLDER, filename=FILENAME)
+    calculate_all_measures(solver)
