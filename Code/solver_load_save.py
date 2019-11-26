@@ -56,6 +56,7 @@ def save_solver(solver, filename='solver.pth', folder='solvers', epoch='', verbo
 
 def load_solver(filename='solver.pth',
                 folder='solvers',
+                load_latest_if_not_found=True,
                 verbose=True):
     """
     Loads a solver
@@ -69,6 +70,17 @@ def load_solver(filename='solver.pth',
 
     if verbose:
         helpers.print_separated("Loading solver from %s%s" % (folder, filename))
+
+    if not os.path.exists(folder + filename) and load_latest_if_not_found:
+        from os import walk
+
+        f = []
+        for (dirpath, dirnames, filenames) in walk(folder):
+            f.extend(filenames)
+            break
+        filename = min(f, key=len)
+    else:
+        raise ValueError('No solver %s%s found.' % folder, filename)
 
     data = cPickle.load(open(folder + filename, 'rb'))
 
