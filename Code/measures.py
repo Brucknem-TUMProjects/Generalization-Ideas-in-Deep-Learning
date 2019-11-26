@@ -2,14 +2,14 @@ import argparse
 import copy
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Callable
+from typing import Callable, List
 
 import numpy as np
 import torch
 
 import data_loader
 import optimizers
-from solver import load_solver, Solver
+from solver import Solver, load_solver
 
 
 def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]:
@@ -37,6 +37,7 @@ def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]
                 outputs[i] /= np.sum(outputs[i])
                 predicted = np.argmax(outputs[i])
                 correct = labels[i]
+
                 if predicted != correct:
                     wrong_labelled += 1
                 correct_labels = outputs[i][labels[i]]
@@ -87,6 +88,7 @@ def norm_product(layers: OrderedDict, order: int = None, with_hidden: bool = Fal
             weights = weights.cpu().numpy()
 
         layer_result = 1
+
         if layer.endswith('weight'):
             try:
                 layer_result = np.linalg.norm(weights, ord=order)
@@ -200,6 +202,7 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
     for layer, weights in reversed(layers.items()):
         if not len(weights.shape) == 2:
             # print("Skipping enumeration of %s layer %s" % (weights.shape, layer))
+
             continue
         # print("Enumerating %s layer %s" % (weights.shape, layer))
         weights = weights.cpu().numpy()
@@ -210,8 +213,10 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
         if not paths.any():
             paths = weights.flatten()
             paths **= power
+
             if multiply_by_hidden_units:
                 paths *= rows
+
             continue
 
         if not collapse_paths:
@@ -221,12 +226,14 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
             paths = paths.reshape((len(paths) // rows, rows)).transpose()
 
         weights **= power
+
         if multiply_by_hidden_units:
             weights *= rows
 
         new_paths = np.empty((0, real_depth + 1), dtype=np.float64)
         with ThreadPoolExecutor(max_workers=8) as executor:
             futures = []
+
             for i in range(len(paths)):
                 incoming_paths = paths[i]
                 outgoing_edges = weights[i % weights.shape[0]]
@@ -241,6 +248,7 @@ def enumerate_paths(layers: OrderedDict, multiply_by_hidden_units: bool = False,
 
         paths = np.array(new_paths, dtype=np.float64)
         # print("Currently enumerated paths: ", len(paths))
+
     return paths, real_depth
 
 
@@ -255,6 +263,7 @@ def append_outgoing_edges(incoming_paths, outgoing_edges, real_depth, collapse_p
     :return:
     """
     new_paths = np.empty((0, real_depth + 1), dtype=np.float64)
+
     for element in incoming_paths:
         if not collapse_paths:
             new_column = np.array([element] * len(outgoing_edges), dtype=np.float64)
@@ -263,6 +272,7 @@ def append_outgoing_edges(incoming_paths, outgoing_edges, real_depth, collapse_p
         else:
             new_path = element * outgoing_edges
             new_paths = np.append(new_paths, new_path)
+
     return new_paths
 
 
@@ -292,14 +302,16 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
     for iteration in range(int(iterations)):
         if not iteration % 50:
             print(iteration)
+
         for layer, weights in model_parameters.items():
             pertubation[layer] = ((np.random.rand(*weights.shape) * 2) - 1) * alpha
 
         for layer, weights in model_parameters.items():
-            pertubated_parameters[layer] = model_parameters[layer] + torch.tensor(pertubation[layer]).to(device)
+            pertubated_parameters[layer] = model_parameters[layer] + torch.tensor(pertubation[layer], dtype=torch.float).to(device)
 
         model.load_state_dict(pertubated_parameters)
         loss = calculate_loss(model, criterion, training_loader) - real_loss
+
         if loss > max_loss:
             max_loss = loss
             print_norm("Sharpness", max_loss)
@@ -407,6 +419,7 @@ def calculate_all_measures(_solver: Solver):
     criterion = getattr(optimizers, _solver.strategy['criterion'])()
     s = sharpness(model, criterion, training_loader, alpha=5e-4, iterations=1e100)
     print_norm("Sharpness", s)
+
     return l2, spectral, l2_path, l1_path, s
 
 
