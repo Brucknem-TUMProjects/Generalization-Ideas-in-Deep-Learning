@@ -404,12 +404,12 @@ def calculate_all_measures(_solver: Solver):
     spectral = spectral_norm(model, training_loader, eps)
     print_norm("Spectral", spectral)
     try:
-        l2_path = l2_path_norm(model, training_loader, eps)
+        l2_path = 0 #l2_path_norm(model, training_loader, eps)
         print_norm("L2-path", l2_path)
     except ValueError:
         print("l2-path norm does not exist")
     try:
-        l1_path = l1_path_norm(model, training_loader, eps)
+        l1_path = 0 # l1_path_norm(model, training_loader, eps)
         print_norm("L1-path", l1_path)
     except ValueError:
         print("l1-path norm does not exist")
