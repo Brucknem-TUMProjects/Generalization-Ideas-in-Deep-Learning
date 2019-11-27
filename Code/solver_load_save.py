@@ -61,6 +61,7 @@ def load_solver(filename='solver.pth',
     """
     Loads a solver
 
+    :param load_latest_if_not_found:
     :param filename:
     :param folder:
     :param verbose:
@@ -71,16 +72,17 @@ def load_solver(filename='solver.pth',
     if verbose:
         helpers.print_separated("Loading solver from %s%s" % (folder, filename))
 
-    if not os.path.exists(folder + filename) and load_latest_if_not_found:
-        from os import walk
+    if not os.path.exists(folder + filename):
+        if load_latest_if_not_found:
+            from os import walk
 
-        f = []
-        for (dirpath, dirnames, filenames) in walk(folder):
-            f.extend(filenames)
-            break
-        filename = min(f, key=len)
-    else:
-        raise ValueError('No solver %s%s found.' % folder, filename)
+            f = []
+            for (_, _, filenames) in walk(folder):
+                f.extend(filenames)
+                break
+            filename = min(f, key=len)
+        else:
+            raise ValueError('No solver %s%s found.' % (folder, filename))
 
     data = cPickle.load(open(folder + filename, 'rb'))
 
