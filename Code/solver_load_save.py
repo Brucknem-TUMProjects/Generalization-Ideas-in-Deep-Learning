@@ -81,6 +81,7 @@ def load_solver(filename='solver.pth',
                 f.extend(filenames)
                 break
             filename = min(f, key=len)
+            print('Dropping back to %s' % filename)
         else:
             raise ValueError('No solver %s%s found.' % (folder, filename))
 

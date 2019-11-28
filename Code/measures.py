@@ -6,6 +6,9 @@ from typing import Callable, List
 
 import numpy as np
 import torch
+from bokeh.io import output_notebook, show, output_file, save, reset_output
+from bokeh.models import NumeralTickFormatter, Range1d
+from bokeh.plotting import figure
 
 import data_loader
 import optimizers
@@ -305,7 +308,8 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
             pertubation[layer] = ((np.random.rand(*weights.shape) * 2) - 1) * alpha
 
         for layer, weights in model_parameters.items():
-            pertubated_parameters[layer] = model_parameters[layer] + torch.tensor(pertubation[layer], dtype=torch.float).to(device)
+            pertubated_parameters[layer] = model_parameters[layer] + torch.tensor(pertubation[layer],
+                                                                                  dtype=torch.float).to(device)
 
         model.load_state_dict(pertubated_parameters)
         loss = calculate_loss(model, criterion, training_loader) - real_loss
@@ -386,7 +390,6 @@ def print_norm(norm, value):
 def calculate_all_measures(_solver: Solver):
     """
 
-    :param name:
     :param _solver:
     :return:
     """
@@ -404,12 +407,12 @@ def calculate_all_measures(_solver: Solver):
     spectral = spectral_norm(model, training_loader, eps)
     print_norm("Spectral", spectral)
     try:
-        l2_path = 0 #l2_path_norm(model, training_loader, eps)
+        l2_path = 0  # l2_path_norm(model, training_loader, eps)
         print_norm("L2-path", l2_path)
     except ValueError:
         print("l2-path norm does not exist")
     try:
-        l1_path = 0 # l1_path_norm(model, training_loader, eps)
+        l1_path = 0  # l1_path_norm(model, training_loader, eps)
         print_norm("L1-path", l1_path)
     except ValueError:
         print("l1-path norm does not exist")
@@ -419,6 +422,114 @@ def calculate_all_measures(_solver: Solver):
     print_norm("Sharpness", s)
 
     return l2, spectral, l2_path, l1_path, s
+
+
+def plot(title, x_labels,
+         y_range,
+         lines=None,
+         x_axis_label='Size of training set',
+         legend_location='top_left',
+         y_axis_type="log",
+         x_axis_type="linear",
+         output_name=None,
+         show_plot=False):
+    """
+
+    :param title:
+    :param x_labels:
+    :param y_range:
+    :param lines:
+    :param x_axis_label:
+    :param legend_location:
+    :param y_axis_type:
+    :param x_axis_type:
+    :param output_name:
+    :param show_plot:
+    :return:
+    """
+    reset_output()
+    output_file('/mnt/nextcloud/tum/Master/3.Semester/Seminar/Presentation/html/' + output_name.replace(' ', ''))
+
+    if lines is None:
+        lines = []
+    if not output_name:
+        output_name = title
+    p = figure(title=title, x_axis_label=x_axis_label, y_range=Range1d(*y_range), y_axis_type=y_axis_type,
+               x_axis_type=x_axis_type,
+               width=int(800 * .7), height=int(600 * .7))
+    for line in lines:
+        y = line['y']
+        legend_label = line['legend_label']
+        t = line['type']
+        line_color = line['line_color']
+        fill_color = line['fill_color']
+        p.line(x_labels, y, legend_label=legend_label, line_color=line_color, line_width=2, line_alpha=1)
+        getattr(p, t)(x_labels, y, legend_label=legend_label, line_color=line_color, fill_color=fill_color,
+                      line_width=4, size=6, line_alpha=1)
+    p.xaxis.formatter = NumeralTickFormatter(format="0a")
+    p.title.text_font_size = '16pt'
+    p.xaxis.axis_label_text_font_size = '16pt'
+    p.xaxis.major_label_text_font_size = '16pt'
+    p.yaxis.axis_label_text_font_size = '16pt'
+    p.yaxis.major_label_text_font_size = '16pt'
+    p.legend.location = legend_location
+    p.xaxis.ticker = x_labels
+    p.legend.click_policy = "hide"
+    if show_plot:
+        output_notebook()
+        show(p)
+
+    save(p)
+    return p
+
+
+def parse_measures(folder, filename):
+    """
+
+    :param folder:
+    :param filename:
+    :return:
+    """
+    if not folder.endswith('/'):
+        folder += '/'
+    with open(folder + filename, 'r') as file:
+        data = file.read()
+
+        name = (data[:data.find('\n')]).split('/')[-2]
+
+        l2, spectral, l2_path, l1_path, sharpness = 0, 0, 0, 0, 0
+
+        if not data.find('L2') < 0:
+            data = data[data.find('L2') + len('L2'):].strip()
+            data = data[data.find(':') + len(':'):].strip()
+            l2 = float(data[:data.find('\n')])
+
+        if not data.find('Spectral') < 0:
+            data = data[data.find('Spectral') + len('Spectral'):].strip()
+            data = data[data.find(':') + len(':'):].strip()
+            spectral = float(data[:data.find('\n')])
+
+        if not data.find('L2-path') < 0:
+            data = data[data.find('L2-path') + len('L2-path'):].strip()
+            data = data[data.find(':') + len(':'):].strip()
+            l2_path = float(data[:data.find('\n')])
+
+        if not data.find('L1-path') < 0:
+            data = data[data.find('L1-path') + len('L1-path'):].strip()
+            data = data[data.find(':') + len(':'):].strip()
+            l1_path = float(data[:data.find('\n')])
+
+        if not data.rfind('Sharpness') < 0:
+            data = data[data.rfind('Sharpness') + len('Sharpness'):].strip()
+            data = data[data.find(':') + len(':'):].strip()
+            sharpness = float(data[:data.find('\n')])
+
+    return {'name': name,
+            'l2': l2,
+            'spectral': spectral,
+            'l2_path': l2_path,
+            'l1_path': l1_path,
+            'sharpness': sharpness}
 
 
 if __name__ == '__main__':

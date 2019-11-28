@@ -1,11 +1,9 @@
-import math
-
 import bokeh
 import matplotlib.pyplot as plt
 import torch
-from bokeh.io import output_notebook, push_notebook, show
+from bokeh.io import output_notebook, push_notebook, show, reset_output
 from bokeh.layouts import row
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, NumeralTickFormatter
 from bokeh.plotting import figure
 
 import helpers
@@ -103,6 +101,15 @@ def print_plots(solver):
     plt.show()
 
 
+def set_plot_settings(p):
+    p.xaxis.formatter = NumeralTickFormatter(format="0a")
+    p.title.text_font_size = '16pt'
+    p.xaxis.axis_label_text_font_size = '16pt'
+    p.xaxis.major_label_text_font_size = '16pt'
+    p.yaxis.axis_label_text_font_size = '16pt'
+    p.yaxis.major_label_text_font_size = '16pt'
+
+
 class SolverPlotter:
     """
     Class to plot the solver histories
@@ -114,6 +121,7 @@ class SolverPlotter:
 
         :param solver:
         """
+        reset_output()
         output_notebook()
         self.tools = "pan,wheel_zoom,box_zoom,reset,save,crosshair, hover"
 
@@ -127,11 +135,13 @@ class SolverPlotter:
         loss_plt = figure(**upper_row_settings,
                           title='Training Loss')
 
-        iterations_per_epoch = math.ceil(solver.data['subset_size'] / solver.data['batch_size'])
+        iterations_per_epoch = 0
 
         flattened_training_x_labels = []
         loss_history = []
         for epoch, iterations in solver.training_loss_history.items():
+            if not iterations_per_epoch:
+                iterations_per_epoch = max(list(iterations.keys())) + 1
             start_iteration = epoch * iterations_per_epoch
             loss_history.extend(iterations.values())
             for iteration in iterations.keys():
@@ -145,6 +155,8 @@ class SolverPlotter:
                       source=loss_plt_data,
                       line_color='red',
                       line_width=1)
+
+        set_plot_settings(loss_plt)
 
         flattened_training_x_labels = []
         accuracy_history = []
@@ -165,6 +177,8 @@ class SolverPlotter:
                           source=accuracy_plt_data,
                           line_color='blue',
                           line_width=1)
+
+        set_plot_settings(accuracy_plt)
 
         training_handle = show(row(loss_plt, accuracy_plt),
                                notebook_handle=True)
@@ -210,8 +224,9 @@ class SolverPlotter:
         epoch_validation_plt_settings['fill_color'] = epoch_validation_plt_settings['line_color']
         epoch_plot.circle('x', 'y', **epoch_validation_plt_settings)
 
-        epoch_plot.legend.click_policy = 'hide'
         epoch_plot.legend.location = 'bottom_right'
+        epoch_plot.legend.click_policy = "hide"
+        set_plot_settings(epoch_plot)
 
         epoch_handle = show(epoch_plot, notebook_handle=True)
 
@@ -278,4 +293,4 @@ def print_bokeh_plots(solver):
     """
     output_notebook()
 
-    self = SolverPlotter(solver)
+    SolverPlotter(solver)
