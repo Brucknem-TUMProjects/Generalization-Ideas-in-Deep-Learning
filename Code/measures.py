@@ -47,7 +47,7 @@ def margins(model: torch.nn.Module, training_loader: data_loader) -> List[float]
                 margin = correct_labels - max_other
                 all_margins.append(margin)
 
-        # print(wrong_labelled, len(all_margins))
+    # print(wrong_labelled, len(all_margins))
 
     return all_margins
 
@@ -297,19 +297,29 @@ def sharpness(model: torch.nn.Module, criterion: Callable, training_loader: data
     # alpha_interval = [-alpha, -alpha / 2.0, alpha / 2.0, alpha]
 
     model_parameters = OrderedDict(copy.deepcopy(dict(model.state_dict())))
+    scaled_model_parameters = OrderedDict()
+    for layer, weights in model_parameters.items():
+        p = weights.clone().float()
+        p = torch.abs(p)
+        p += 1.0
+        p *= alpha
+        scaled_model_parameters[layer] = p
+
     pertubated_parameters = OrderedDict()
     pertubation = OrderedDict()
 
     for iteration in range(int(iterations)):
-        if not iteration % 50:
+        if not iteration % 1:  # 50:
             print(iteration)
 
         for layer, weights in model_parameters.items():
-            pertubation[layer] = ((np.random.rand(*weights.shape) * 2) - 1) * alpha
+            r = torch.rand(weights.shape).to(device)
+            r *= 2.0
+            r -= 1.0
+            pertubation[layer] = scaled_model_parameters[layer] * r
 
         for layer, weights in model_parameters.items():
-            pertubated_parameters[layer] = model_parameters[layer] + torch.tensor(pertubation[layer],
-                                                                                  dtype=torch.float).to(device)
+            pertubated_parameters[layer] = model_parameters[layer] + pertubation[layer]
 
         model.load_state_dict(pertubated_parameters)
         loss = calculate_loss(model, criterion, training_loader) - real_loss
@@ -402,9 +412,9 @@ def calculate_all_measures(_solver: Solver):
 
     eps = 0.05
 
-    l2 = l2_norm(model, training_loader, eps)
+    l2 = 0  # l2_norm(model, training_loader, eps)
     print_norm("L2", l2)
-    spectral = spectral_norm(model, training_loader, eps)
+    spectral = 0  # spectral_norm(model, training_loader, eps)
     print_norm("Spectral", spectral)
     try:
         l2_path = 0  # l2_path_norm(model, training_loader, eps)

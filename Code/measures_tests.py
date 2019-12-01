@@ -68,6 +68,7 @@ if __name__ == '__main__':
         ('layers.2.weight', torch.tensor([[19, 20, 21, 22], [23, 24, 25, 26]])),
         ('layers.2.bias', torch.tensor([0, 0]))
     ])
+
     assert (np.array_equal(measures.enumerate_paths(FC_TEST_LAYERS, collapse_paths=True)[0], np.array(FC_PATHS).prod(axis=1)))
     assert (np.array_equal(measures.enumerate_paths(FC_TEST_LAYERS, collapse_paths=False)[0], FC_PATHS))
 
@@ -75,14 +76,14 @@ if __name__ == '__main__':
     net.load_state_dict(FC_TEST_LAYERS)
     data_loader = get_test_data_loader()
 
-    assert(measures.gamma_margin(net, data_loader) == 1)
+    assert(measures.gamma_margin(net, data_loader) == 8656.0)
 
     l1_path_norm = measures.l1_path_norm(net, data_loader)
-    assert(l1_path_norm == 155677593600.0)
+    assert(l1_path_norm == 2077.741978468025)
 
     l2_path_norm = measures.l2_path_norm(net, data_loader)
-    assert(l2_path_norm == 109977882624.0)
+    assert(l2_path_norm == 1467.8134351051144)
 
-    np.random.seed(123456789)
+    torch.manual_seed(123456789)
     sharpness = measures.sharpness(net, optimizers.cross_entropy_loss(), data_loader, alpha=10, iterations=10)
-    assert(sharpness == 8081.87890625)
+    assert(sharpness == 4537067.729166666977107524871826171875)
