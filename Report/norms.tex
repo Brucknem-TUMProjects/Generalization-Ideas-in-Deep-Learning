@@ -1,0 +1,16 @@
+%!TEX root=./report.tex
+
+\section{What is a matrix norm and which do we use}
+\subsection{What is a matrix norm}
+What does it do to the function
+
+\subsection{Why do we use matrix norms as measures for capacity bounds}
+how controls the norm the model capacity
+
+\subsection{Which norms do we use}
+\begin{itemize}
+	\item $l2$ norm with capacity proportional to  $\frac{1}{\gamma_{margin}^2} \prod_{i=1}^{d} 4 \left\| W_i  \right\|_F^2$ \inlineeqno
+	\item $l1$-path norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \left| \sum_{j \in \prod_{k=0}^d[h_k]}^{} \left| \prod_{i=1}^{d} 2 W_i [j_i, j_{i-1}] \right|\right|^2$ \inlineeqno
+	\item $l2$-path norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \sum_{j \in \prod_{k=0}^d[h_k]}^{} \prod_{i=1}^{d} 4 h_i W_i^2 [j_i, j_{i-1}]$ \inlineeqno
+	\item spectral norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \prod_{i=1}^{d} h_i \left\| W_i  \right\|_2^2$ \inlineeqno
+\end{itemize}

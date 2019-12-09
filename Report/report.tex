@@ -13,6 +13,7 @@
 
 \pagestyle{fancy}
 
+\graphicspath{ {../Presentation/}}
 
 %You can add theorem-like environments (e.g. remark, definition, ...) if you want
 \newtheorem{theorem}{Theorem}
@@ -28,35 +29,37 @@
 \lhead{\runauthor}
 \rhead{\runtitle}
 
-
-
+\newcommand{\signed}[1]{%
+	{\unskip\nobreak\hfil\penalty50
+		\hskip2em\hbox{}\nobreak\hfil#1
+		\parfillskip=0pt \finalhyphendemerits=0 \par}}
+\newcommand\inlineeqno{\signed{\stepcounter{equation}\ (\theequation)}}
+\newcommand{\fref}[1]{(Fig: \ref{#1})}
+\newcommand{\freff}[1]{Figure \ref{#1}}
+\newcommand{\ns}{Neyshabur et al. \cite{neyshabur2017exploring}}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-Trying to understand the generalization abilities of deep neural networks several capacity measures are experimentally explored. Following the thoughts of \cite{neyshabur2017exploring} different norm-based capacity measures over the network weights and the sharpness as the robustness to pertubations on the parameter space are investigated. The measures are used in different experiments and the results are plotted against each other.
+Trying to understand the generalization abilities of deep neural networks several capacity measures are experimentally explored. Following the thoughts of \cite{neyshabur2017exploring} different norm-based capacity measures over the network weights and the sharpness as the robustness to perturbations on the parameter space are investigated. The measures are used in different experiments and the results are plotted against each other.
 \end{abstract}
 
-\section{What is generalization and why do we want it}
-
-\section{What is a matrix norm and which do we use}
-\subsection{What is a matrix norm}
-\subsection{Why do we use matrix norms as measures for capacity bounds}
-\subsection{Which norms do we use}
-\begin{itemize}
-    \item $l2$ norm
-    \item $l1$-path norm
-    \item $l2$-path norm
-    \item spectral norm
-    \item spectral norm
-    \item spectral norm
-    \item spectral norm
-    \item spectral norm
-\end{itemize}
+\section{Introduction}
+Huge empirical success of deep neural networks \\
+Complex, non-convex optimization problem \\
+Simple stochastic gradient descent (SGD) methods achieve good generalization \\
+Even in this highly over parameterized setting \\
+Many local minima with different generalization behavior 
+%
+\input{norms.tex}
 
 \section{What is sharpness}
+
+\newpage
+\input{empirical_study.tex}
+
 \newpage
 
 \section{A few remarks}
