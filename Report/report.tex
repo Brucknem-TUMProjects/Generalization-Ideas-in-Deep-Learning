@@ -34,16 +34,16 @@
 		\hskip2em\hbox{}\nobreak\hfil#1
 		\parfillskip=0pt \finalhyphendemerits=0 \par}}
 \newcommand\inlineeqno{\signed{\stepcounter{equation}\ (\theequation)}}
-\newcommand{\fref}[1]{(Fig: \ref{#1})}
-\newcommand{\freff}[1]{Figure \ref{#1}}
-\newcommand{\ns}{Neyshabur et al. \cite{neyshabur2017exploring}}
+\newcommand{\fref}[1]{(Fig:~\ref{#1})}
+\newcommand{\freff}[1]{Figure~\ref{#1}}
+\newcommand{\ns}{Neyshabur~et~al.~\cite{neyshabur2017exploring}}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-Trying to understand the generalization abilities of deep neural networks several capacity measures are experimentally explored. Following the thoughts of \cite{neyshabur2017exploring} different norm-based capacity measures over the network weights and the sharpness as the robustness to perturbations on the parameter space are investigated. The measures are used in different experiments and the results are plotted against each other.
+Trying to understand the generalization abilities of deep neural networks several capacity measures are experimentally explored. Following the thoughts of \ns{} different norm-based capacity measures over the network weights and the sharpness as the robustness to perturbations on the parameter space are investigated. The measures are used in different experiments and the results are plotted against each other.
 \end{abstract}
 
 \section{Introduction}
@@ -55,14 +55,17 @@ Many local minima with different generalization behavior
 %
 \input{norms.tex}
 
-\section{What is sharpness}
+\input{sharpness.tex}
 
 \newpage
 \input{empirical_study.tex}
 
+\input{conclusion.tex}
+
 \newpage
 
 \input{appendix.tex}
+
 \newpage
 
 \nocite{*}

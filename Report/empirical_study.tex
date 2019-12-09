@@ -5,11 +5,11 @@ In this section we discuss the experimental results using the proposed measures 
 \subsection{Difference between true and random labeled data}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.24\linewidth]{vgg16/bokeh_plot.png}
-	\includegraphics[width=0.24\linewidth]{vgg16/bokeh_plot(1).png}
-	\includegraphics[width=0.24\linewidth]{vgg16/bokeh_plot(2).png}\\
-	\includegraphics[width=0.24\linewidth]{vgg16/bokeh_plot(3).png}
-	\includegraphics[width=0.24\linewidth]{vgg16/bokeh_plot(4).png}
+	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot(1).png}
+	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot(2).png}\\
+	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot(3).png}
+	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot(4).png}
 	\caption{The proposed capacity measures calculated on the VGG model \cite{simonyan2014deep} after training on random (magenta) and true (blue) labeled subsets of CIFAR-10. We see only a small increase of the measures on true labels but a huge increase using random labels and the measures on random labels to be bigger for every subset. Reproduced from \cite{neyshabur2017exploring}.}	
 	\label{fig:norms-paper}
 \end{figure}
@@ -24,9 +24,9 @@ Looking at the sharpness as a capacity measure in \freff{fig:norms-paper} we do 
 \label{sec:problems-subset-sizes}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.24\linewidth]{vgg16/l2_own.png}
-	\includegraphics[width=0.24\linewidth]{vgg16/spectral_own.png}
-	\includegraphics[width=0.24\linewidth]{vgg16/sharpness_own.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/l2_own.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/spectral_own.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/sharpness_own.png}
 	\caption{Our own results for the $l2$ and spectral norm as well as the sharpness calculated on the VGG-16 model after training on subsets of CIFAR-10. The results show no reproducibility of the results presented by \cite{neyshabur2017exploring}.}	
 	\label{fig:norms-own}
 \end{figure}
@@ -72,24 +72,24 @@ Following the increase in test error and the resulting worse generalization beha
 %
 \begin{figure}
 	\centering
-	\includegraphics[width=0.24\linewidth]{vgg16/confusion/errors_01.png}
-	\includegraphics[width=0.24\linewidth]{vgg16/confusion/measures.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/confusion/errors_01.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/confusion/measures.png}
 	\caption{The test and training error on the subset of CIFAR-10 and varying confusion set sizes (left) and the corresponding proposed capacity measures (right). Reproduced from \cite{neyshabur2017exploring}.}	
 	\label{fig:confusion-paper}
 \end{figure}
 \begin{figure}
 \centering
-\includegraphics[width=0.24\linewidth]{vgg16/confusion/errors_own.png}
-\includegraphics[width=0.24\linewidth]{vgg16/confusion/measures_own.png}
+\includegraphics[width=0.32\linewidth]{vgg16/confusion/errors_own.png}
+\includegraphics[width=0.32\linewidth]{vgg16/confusion/measures_own.png}
 \caption{Our own results for the test and training error on the subset of CIFAR-10 and varying confusion set sizes (left) and the corresponding proposed capacity measures (right).}	
 \label{fig:confusion-own}
 \end{figure}
 %
 \subsubsection{Problems reproducing results}
-We faced most of the problems already described in \ref{sec:problems-subset-sizes}. Especially the missing model and solving strategy details \ref{sec:problems-reproduction-training} as well as the calculation of the norms \ref{sec:problems-calculation-norms} prevented us from reproducing meaningful results. Nonetheless, the results are displayed in \freff{fig:confusion-own}.
+We faced most of the problems already described in \ref{sec:problems-subset-sizes}. Especially the missing model and solving strategy details \ref{sec:problems-reproduction-training} as well as the calculation of the norms \ref{sec:problems-calculation-norms} prevented us from reproducing meaningful results. Nonetheless, the results are displayed in \freff{fig:confusion-own} where we can see an increase of the test error as expected when increasing the subset size. The calculated measures do not follow the expected behavior to increase with the worse generalization ability and sharpness wasn't calculable at all.
 %
-\paragraph{Training to zero training loss not possible}
-For the biggest confusion set size training to zero training loss was not possible. We tried different optimization strategies and hyper parameters but couldn't drive the model to zero training loss.
+\paragraph{Training to zero training error not possible}
+For the biggest confusion set size training to zero training error was not possible. We tried different optimization strategies and hyper parameters but couldn't drive the model to zero training error.
 %
 %
 %
@@ -99,7 +99,39 @@ For the biggest confusion set size training to zero training loss was not possib
 %
 %
 \subsection{Implications of different hidden unit sizes}
-Increasing the number of hidden units, thereby increasing the number of parameters, can
-lead to a decrease in generalization error even when the training error does not decrease.
-We would expect to see the complexity measure decrease as we increase the number of
-hidden units. \cite{neyshabur2017exploring} 
+Increasing the number of hidden units, thereby increasing the number of parameters, can lead to a decrease in generalization error even when the training error does not decrease. We would expect to see the complexity measure decrease as we increase the number of
+hidden units. \cite{neyshabur2017exploring} \par
+%
+To investigate into this phenomenon \ns{} trained a two layer perceptron \fref{fig:mnist-two-layer} on the MNIST handwritten digit data set \fref{fig:mnist-two-layer} using different numbers of hidden units. We see in \ref{fig:hidden-units-paper} that the networks achieve zero training error for 32 and more hidden units and even though there is no decrease in the training error afterwards we see a decrease in the test error with every increase of the hidden units.\\
+%
+Looking at the capacity measures in \freff{fig:hidden-units-paper} we see that the $l2$-path and spectral norm follow the expected behavior and decrease with the increase of hidden units whereas the $l1$-path norm, the $l2$ norm and sharpness do not behave as proposed.
+%
+Reproducing the results of \cite{neyshabur2017exploring} put out the values displayed in \freff{fig:hidden-units-own} where we can see that we could achieve a decrease of the $l2$ and $l1$-path norm with the increase of hidden units but see the opposing behavior for the other norms and again no direct correlation between sharpness and generalization behavior.
+%
+\begin{figure}
+	\centering
+	\includegraphics[width=0.32\linewidth]{mnist/hidden_units_error.png}
+	\includegraphics[width=0.32\linewidth]{mnist/hidden_units_measures.png}
+	\caption{The test and training error on the MNIST handwritten digit data set and varying hidden unit sizes (left) and the corresponding proposed capacity measures (right). Reproduced from \cite{neyshabur2017exploring}.}	
+	\label{fig:hidden-units-paper}
+\end{figure}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.32\linewidth]{mnist/hidden_units_error_own.png}
+	\includegraphics[width=0.32\linewidth]{mnist/hidden_units_measures_own.png}
+	\caption{Our own results for the test and training error on the MNIST handwritten digit data set and varying hidden unit sizes (left) and the corresponding proposed capacity measures (right).}	
+	\label{fig:hidden-units-own}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
