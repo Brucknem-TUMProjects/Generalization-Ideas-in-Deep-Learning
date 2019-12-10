@@ -10,6 +10,7 @@
 \usepackage{subfigure}
 \usepackage{float}
 \usepackage{hyperref}
+\usepackage{mathtools}
 
 \pagestyle{fancy}
 
@@ -36,6 +37,7 @@
 \newcommand\inlineeqno{\signed{\stepcounter{equation}\ (\theequation)}}
 \newcommand{\fref}[1]{(Fig:~\ref{#1})}
 \newcommand{\freff}[1]{Figure~\ref{#1}}
+\newcommand{\sref}[1]{Section~\ref{#1}}
 \newcommand{\ns}{Neyshabur~et~al.~\cite{neyshabur2017exploring}}
 
 \begin{document}
@@ -43,21 +45,16 @@
 \maketitle
 
 \begin{abstract}
-Trying to understand the generalization abilities of deep neural networks several capacity measures are experimentally explored. Following the thoughts of \ns{} different norm-based capacity measures over the network weights and the sharpness as the robustness to perturbations on the parameter space are investigated. The measures are used in different experiments and the results are plotted against each other.
+Trying to understand the generalization abilities of deep neural networks several capacity measures are experimentally explored. Following the thoughts of \ns{} different norm-based capacity measures on the network weights and sharpness as the robustness to perturbations on the parameter space are investigated. The measures are used in different experiments and the results are plotted against each other.
 \end{abstract}
 
 \section{Introduction}
-Huge empirical success of deep neural networks \\
-Complex, non-convex optimization problem \\
-Simple stochastic gradient descent (SGD) methods achieve good generalization \\
-Even in this highly over parameterized setting \\
-Many local minima with different generalization behavior 
+In recent years we have seen the huge empirical success of deep neural networks. Even though they solve complex, highly non-convex optimization problems simple stochastic gradient descent methods achieve good generalization behavior in practice. We see that even in the highly over parameterized regime in which deep neural networks are located many of the local minima achieve good generalization on unseen data. Nonetheless, it remains mostly unclear why they exhibit the desired generalization behavior.\\
 %
-\input{norms.tex}
+\ns{} provided us with a methodology to investigate into measures of the generalization ability. Using this framework we tried to reproduce their results and to understand how different measures on the parameter space can explain certain empirical phenomena that are directly connected to generalization abilities of deep neural networks.
+%
+\input{capacity_measures.tex}
 
-\input{sharpness.tex}
-
-\newpage
 \input{empirical_study.tex}
 
 \input{conclusion.tex}

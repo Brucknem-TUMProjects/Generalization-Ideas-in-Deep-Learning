@@ -1,0 +1,32 @@
+%!TEX root=./report.tex
+
+\section{Capacity control}
+\ns{} examined complexity measures that have recently been suggested, or could be considered, in explaining generalization in deep learning. They evaluated the measures based on their ability to theoretically guarantee generalization, and their empirical ability to explain the phenomena discussed in \sref{sec:empricial-study}. 
+%
+\subsection{Norm-based capacity control}
+For deep neural networks a multitude of norm-based regularization techniques on the network weights have been established. Different approaches, e.g. the $l1/l2$ norms, their respective path norms \cite{DBLP:journals/corr/NeyshaburSS15} or the spectral and nuclear norm are used to control the capacity of networks independent of the number of parameters.
+%
+\paragraph{Margin}
+To meaningful compare norms of deep neural networks we have to explicitly take into account the scaling of the outputs of the network. As we drive the training error to zero we have to push the cross entropy loss to zero and thus the outputs of the network must go to infinity. This means that minimizing the cross entropy loss will drive the norms towards infinity. \\
+In practice, we will stop the training after some finite time and the norm of the network will be large but also finite. The resulting norm value will mostly be an indicator on how far the training has progressed.\\
+To overcome this scaling issues \cite{neyshabur2017exploring} suggested using the margin over the whole training set, where the margin for a single data point is the difference between the score of the correct label and the maximum score of other labels $f_w(x)[y_{true}] - max_{x \neq y_{true}}f_w(x)[y]$. As taking the minimum margin over the whole training set is really sensitive to outliers \cite{neyshabur2017exploring} defined the $\gamma_{margin}$ as the lowest value of $\gamma$ such that $\lceil\epsilon m\rceil$ data points have margin lower than $\gamma$, where m is the size of the training set and $\epsilon > 0$ is small.
+%
+\paragraph{Norms}
+The measures investigated by \cite{neyshabur2017exploring} and the corresponding capacity bounds are as follows:
+%
+\begin{itemize}
+	\item $l2$ norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \prod_{i=1}^{d} 4 \left\| W_i  \right\|_F^2$ \inlineeqno
+	\item $l1$-path norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \left| \sum_{j \in \prod_{k=0}^d[h_k]}^{} \left| \prod_{i=1}^{d} 2 W_i [j_i, j_{i-1}] \right|\right|^2$ \inlineeqno
+	\item $l2$-path norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \sum_{j \in \prod_{k=0}^d[h_k]}^{} \prod_{i=1}^{d} 4 h_i W_i^2 [j_i, j_{i-1}]$ \inlineeqno
+	\item spectral norm with capacity proportional to $\frac{1}{\gamma_{margin}^2} \prod_{i=1}^{d} h_i \left\| W_i  \right\|_2^2$ \inlineeqno
+\end{itemize}
+where $\prod_{i=1}^{d}\dots$ is the product over all network layers, $h_i$ is the number of hidden units in layer $i$ and $\prod_{k=0}^d[h_k]\dots$ is the Cartesian product over sets $[h_k]$ and displays the enumeration of all paths through the network from input to output nodes.
+%
+\subsection{Sharpness}
+Keshkar er al. \cite{DBLP:journals/corr/KeskarMNST16} recently suggested sharpness as a generalization measure that corresponds to robustness to adversarial perturbations on the parameter space:
+%
+\begin{equation}
+\zeta _\alpha (w) = \frac{\max_{\left| \nu_i \right| \le \alpha(\left| w_i  \right| + 1) }\hat{L}(f_{w + \nu}) - \hat{L}(f_w)}{1 + \hat{L}(f_w)} \cong \max_{\left| \nu_i \right| \le \alpha(\left| w_i  \right| + 1) }\hat{L}(f_{w + \nu}) - \hat{L}(f_w)
+\end{equation}
+% 
+where $\hat{L}(f_{w})$ is the empirical loss over the whole training set and generally very small, so we can drop it from the denominator.
