@@ -3,8 +3,8 @@
 \label{sec:empricial-study}
 In this section we discuss the experimental results using the proposed measures and their implications on different phenomena seen in practice regarding the generalization behavior.
 %
-\subsection{Difference between true and random labeled data}
-\begin{figure}[h]
+\subsection{Lower capacity measure of networks trained on true labels}
+\begin{figure}[ht]
 	\centering
 	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot.png}
 	\includegraphics[width=0.32\linewidth]{vgg16/bokeh_plot(1).png}
@@ -17,13 +17,13 @@ In this section we discuss the experimental results using the proposed measures 
 It is possible to obtain zero training error on random labels using the same architecture for which training with real labels leads to good generalization. We would expect the networks learned using real labels (and which generalizes well) to have much lower complexity, under the suggested measure, than those learned using random labels (and which obviously do not generalize well). \cite{neyshabur2017exploring} \par
 %
 \freff{fig:norms-paper} shows the results of \cite{neyshabur2017exploring}. We see that training the network on true labels (blue) only results in small increases of the norm-based capacity measures in comparison to the increases when training on random labels (magenta). As the network learns the true functional dependence between the input and output using true labels it only requires small increases in complexity as the subset size increases, whereas it requires more capacity for every newly seen data point when using random labels as it needs to memorize the data point.\\
-We also see that the norm-based capacity measures are all bigger for random labeled data as the network has to memorize the data whereas the dependence between the input and output can be learned with lower capacity on true labeled data. \par
+We also see that the norm-based capacity measures are all bigger for random labeled data as the network has to memorize the data whereas the dependence between the input and output can be learned with lower capacity on true labeled data. \\
 %
 Looking at the sharpness as a capacity measure in \freff{fig:norms-paper} we do not see a direct correlation between its value and the capacity of the network. We expect the model to become less sharp when increasing the network size which can be seen looking at the true labeled data points (blue) but clearly gets violated by the random labeled data points (magenta). Furthermore, we see a lower sharpness for random labels for the two smallest subset sizes which contradicts the intuition that the sharpness should be always lower for true labels. 
 %
 \subsubsection{Problems reproducing results}
 \label{sec:problems-subset-sizes}
-\begin{figure}[h]
+\begin{figure}[ht]
 	\centering
 	\includegraphics[width=0.32\linewidth]{vgg16/l2_own.png}
 	\includegraphics[width=0.32\linewidth]{vgg16/spectral_own.png}
@@ -31,7 +31,7 @@ Looking at the sharpness as a capacity measure in \freff{fig:norms-paper} we do 
 	\caption{Our own results for the $l2$ and spectral norm as well as the sharpness calculated on the VGG-16 model after training on subsets of CIFAR-10. The results show no reproducibility of the results presented by \cite{neyshabur2017exploring}.}	
 	\label{fig:norms-own}
 \end{figure}
-Following the vague instructions of \cite{neyshabur2017exploring} the VGG-16 network with batch normalization \fref{fig:cifar-vgg} is trained on different subsets of the CIFAR-10 \fref{fig:cifar-vgg} data set. For every subset a copy with the labels replaced by random labels has been created and the model is trained on both the true and random labeled subset. \\
+Following the vague instructions of \cite{neyshabur2017exploring} we trained the VGG-16 network with batch normalization \fref{fig:cifar-vgg} on different subsets of the CIFAR-10 \fref{fig:cifar-vgg} data set. For every subset we created a copy with the labels replaced by random labels and trained the model on both the true and random labeled subset. \\
 %
 The huge scope for interpretation of the approach used in \cite{neyshabur2017exploring} caused the non reproducibility of the results which are shown in \freff{fig:norms-own}. The problems we face are:
 %
@@ -42,14 +42,14 @@ Furthermore, \cite{neyshabur2017exploring} didn't provide information on the use
 %
 \paragraph{Calculation of norms}
 \label{sec:problems-calculation-norms}
-The calculation of path norms is trivial for the fully connected case but not for convolutional layers. As we need to enumerate every path through the network we need a way to associate the layer neurons of succeeding layers when applying a convolution. In the short time of this paper we couldn't come up with a feasible implementation which made it impossible to reproduce the path norms.
+The calculation of path norms \cite{DBLP:journals/corr/NeyshaburSS15} is trivial for the fully connected case but not for convolutional layers. As we need to enumerate every path through the network we need a way to associate the layer neurons of succeeding layers when applying a convolution. In the short time of this paper we couldn't come up with a feasible implementation which made it impossible to reproduce the path norms.
 %
 \paragraph{Training on random labeled data}
 Following the missing details of the network implementation and solving strategy a training on random labeled data was not possible. The network didn't overcome a $1/10$ test accuracy on random labels which represents a random choice of the result by the network out of the $10$ classes in the CIFAR-10 data set.
 
 \paragraph{Training time}
 \label{sec:problems-training-time}
-The short scope of the seminar enclosing this paper combined with training times ranging from roughly five hours on the smallest subset ranging up to over one day for the biggest one resulted in only small search intervals for the grid search used on the hyper parameters as well for the algorithmic and architectural choices.
+The short scope of the seminar enclosing this paper combined with training times ranging from roughly five hours on the smallest subset going up to over one day for the biggest one resulted in only small search intervals for the grid search used on the hyper parameters as well for the algorithmic and architectural choices.
 %
 \paragraph{Sharpness}
 \label{sec:problems-sharpness}
@@ -60,7 +60,7 @@ Sharpness as the maximum over the adversarial perturbations is a maximization pr
 %
 %
 %
-\subsection{Difference between local minima}
+\subsection{Generalization behavior on different parameter choices}
 When training the same architecture, with the same training set, using two different optimization methods (or different algorithmic or parameter choices), one method results in better generalization even though both lead to zero training error. We would
 expect to see a correlation between the complexity measure and generalization ability among zero-training error models. \cite{neyshabur2017exploring} \par
 %
@@ -69,7 +69,13 @@ To drive the network towards different parameter choices \cite{neyshabur2017expl
 We expect to see an increase of the test error with increasing confusion set size as the network not only has to learn the functional dependence between the input and output data but also has to memorize an increasing number of random labeled data points.
 This memorization prevents the network from generalizing well and can be seen in \freff{fig:confusion-paper}.\\
 %
-Following the increase in test error and the resulting worse generalization behavior we expect the capacity measure to increase with the test error. In \freff{fig:confusion-paper} we see this behavior for all the norm-based capacity measures which hints towards them being a valid measure for generalization behavior. But again we see the sharpness to have no direct correlation to the test error which hints that it cannot predict generalization.
+Following the increase in test error and the resulting worse generalization behavior we expect the capacity measure to increase with the test error. In \freff{fig:confusion-paper} we see this behavior for all the norm-based capacity measures which hints towards them being a valid measure for generalization behavior. But again we see the sharpness to have no direct correlation to the test error which shows that it cannot predict generalization.
+%
+\subsubsection{Problems reproducing results}
+We faced most of the problems already described in \ref{sec:problems-subset-sizes}. Especially the missing model and solving strategy details as well as the calculation of the norms prevented us from reproducing meaningful results. Nonetheless, the results are displayed in \freff{fig:confusion-own} where we can see an increase of the test error as expected when increasing the subset size. The calculated measures do not follow the expected behavior to increase with the worse generalization ability and sharpness wasn't calculable at all.
+%
+\paragraph{Training to zero training error not possible}
+For the biggest confusion set size training to zero training error was not possible. We tried different optimization strategies and hyper parameters but couldn't drive the model to zero training error.
 %
 \begin{figure}
 	\centering
@@ -79,18 +85,13 @@ Following the increase in test error and the resulting worse generalization beha
 	\label{fig:confusion-paper}
 \end{figure}
 \begin{figure}
-\centering
-\includegraphics[width=0.32\linewidth]{vgg16/confusion/errors_own.png}
-\includegraphics[width=0.32\linewidth]{vgg16/confusion/measures_own.png}
-\caption{Our own results for the test and training error on the subset of CIFAR-10 and varying confusion set sizes (left) and the corresponding proposed capacity measures (right).}	
-\label{fig:confusion-own}
+	\centering
+	\includegraphics[width=0.32\linewidth]{vgg16/confusion/errors_own.png}
+	\includegraphics[width=0.32\linewidth]{vgg16/confusion/measures_own.png}
+	\caption{Our own results for the test and training error on the subset of CIFAR-10 and varying confusion set sizes (left) and the corresponding proposed capacity measures (right).}	
+	\label{fig:confusion-own}
 \end{figure}
 %
-\subsubsection{Problems reproducing results}
-We faced most of the problems already described in \ref{sec:problems-subset-sizes}. Especially the missing model and solving strategy details \ref{sec:problems-reproduction-training} as well as the calculation of the norms \ref{sec:problems-calculation-norms} prevented us from reproducing meaningful results. Nonetheless, the results are displayed in \freff{fig:confusion-own} where we can see an increase of the test error as expected when increasing the subset size. The calculated measures do not follow the expected behavior to increase with the worse generalization ability and sharpness wasn't calculable at all.
-%
-\paragraph{Training to zero training error not possible}
-For the biggest confusion set size training to zero training error was not possible. We tried different optimization strategies and hyper parameters but couldn't drive the model to zero training error.
 %
 %
 %
